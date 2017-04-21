@@ -2,7 +2,9 @@ Set<Position> startLocationPositionSet = new HashSet<Position>();
 Set<Position> unexploredStartLocationPositionSet = new HashSet<Position>();
 Boolean scoutingProbeFound = false;
 Boolean scoutingProbeActive = false;
+Boolean enemyBaseFound = false;
 Unit scoutingProbe = null;
+Position closestUnexploredStartLocation = null;
 
 onStart()
 {
@@ -44,6 +46,17 @@ onFrame()
             scoutingProbeFound = false;
             break;
         }
+        
+        if (!enemyBaseFound)
+        {
+            scoutingProbe.move(closestUnexploredStartLocation)
+        }
+    }
+        
+    for (Position unexploredStartLocationPosition : unexploredStartLocationPositionSet)
+    {         
+        if (closestUnexploredStartLocation == null || scoutingProbe.getDistance(unexploredStartLocationPosition) < scoutingProbe.getDistance(closestUnexploredStartLocation))
+        closestUnexploredStartLocation = unexploredStartLocationPosition;
     }
     
     for (Position startLocationPosition : startLocationPositionSet)
