@@ -1,4 +1,4 @@
-HashSet<Position> startLocationSet = new HashSet<Position>();
+Set<Position> startLocationSet = new HashSet<Position>();
 Boolean scoutingProbeFound = false;
 Unit scoutingProbe = null;
 
@@ -10,6 +10,8 @@ onStart()
         Position positionCorrespondingToStartLocation = tileCorrespondingToStartLocation.toPosition();
         startLocationSet.add(positionCorrespondingToStartLocation);
     }
+    
+    Position[] startLocationArray = startLocationSet.toArray(new Position[startLocationSet.size()]);
 }
 
 onFrame()
