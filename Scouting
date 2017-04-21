@@ -51,6 +51,11 @@ onFrame()
         {
             scoutingProbe.move(closestUnexploredStartLocation)
         }
+        
+        if (enemyBaseFound)
+        {
+        
+        }
     }
         
     for (Position unexploredStartLocationPosition : unexploredStartLocationPositionSet)
