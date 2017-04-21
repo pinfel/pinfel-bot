@@ -1,4 +1,5 @@
-Set<Position> startLocationSet = new HashSet<Position>();
+Set<Position> startLocationPositionSet = new HashSet<Position>();
+Set<Position> unexploredStartLocationPositionSet = new HashSet<Position>();
 Boolean scoutingProbeFound = false;
 Boolean scoutingProbeActive = false;
 Unit scoutingProbe = null;
@@ -9,10 +10,10 @@ onStart()
     {
         TilePosition tileCorrespondingToStartLocation = new TilePosition (startLocation.getX()/32, startLocation.getY()/32);
         Position positionCorrespondingToStartLocation = tileCorrespondingToStartLocation.toPosition();
-        startLocationSet.add(positionCorrespondingToStartLocation);
+        startLocationPositionSet.add(positionCorrespondingToStartLocation);
     }
     
-    Position[] startLocationArray = startLocationSet.toArray(new Position[startLocationSet.size()]);
+    unexploredStartLocationPositionSet = startLocationPositionSet;       
 }
 
 onFrame()
@@ -37,12 +38,14 @@ onFrame()
     
     if (scoutingProbeFound)
     {
-        If (!scoutingProbe.exists())
+        if (!scoutingProbe.exists())
         {
             scoutingProbe = null;
             scoutingProbeFound = false;
             break;
         }
+        
+        
     }   
 }
     
