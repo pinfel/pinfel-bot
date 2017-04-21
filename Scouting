@@ -1,5 +1,6 @@
 Set<Position> startLocationSet = new HashSet<Position>();
 Boolean scoutingProbeFound = false;
+Boolean scoutingProbeActive = false;
 Unit scoutingProbe = null;
 
 onStart()
@@ -16,7 +17,12 @@ onStart()
 
 onFrame()
 {
-    if (self.getAllUnitCount(UnitType.Protoss_Pylon) >= 1 && !scoutingProbeFound)
+    if (self.allUnitCount(UnitType.Protoss_Pylon) >= 1)
+    {
+        scoutingProbeActive = true;
+    }
+    
+    if (scoutingProbeActive && !scoutingProbeFound)
     {
         for (Unit myUnit : self.getUnits())
         {
@@ -27,16 +33,16 @@ onFrame()
                 break;
             }
         }
-    
-        if (scoutingProbeFound)
-        {
-            If (!scoutingProbe.exists())
-            {
-                scoutingProbe = null;
-                scoutingProbeFound = false;
-                break;
-            }
-        }
     }
+    
+    if (scoutingProbeFound)
+    {
+        If (!scoutingProbe.exists())
+        {
+            scoutingProbe = null;
+            scoutingProbeFound = false;
+            break;
+        }
+    }   
 }
     
