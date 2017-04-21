@@ -5,6 +5,11 @@ import bwta.BaseLocation;
 
 public class Pinfel_Bot extends DefaultBWListener
 {
+	public static void main(strings[] args)
+	{
+		new Pinfel_Bot().run();
+	}
+	
 	private Mirror mirror = new Mirror();
 	private Game game;
 	private Player self;
@@ -14,6 +19,7 @@ public class Pinfel_Bot extends DefaultBWListener
 		mirror.startGame();
 	}
 	
+	@Override
 	public void OnStart()
 	{
 		game = mirror.getGame();
@@ -24,5 +30,12 @@ public class Pinfel_Bot extends DefaultBWListener
 		BWTA.readMap();
 		BWTA.analyze();		
 	}
+	
+	@Override
+	public void OnFrame()
+	{
+	
+	}
+}
 	
 	
