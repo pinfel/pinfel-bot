@@ -5,7 +5,7 @@ import bwta.BaseLocation;
 
 public class Pinfel_Bot extends DefaultBWListener
 {
-	public static void main(strings[] args)
+	public static void main(Strings[] args)
 	{
 		new Pinfel_Bot().run();
 	}
@@ -20,7 +20,7 @@ public class Pinfel_Bot extends DefaultBWListener
 	}
 	
 	@Override
-	public void OnStart()
+	public void onStart()
 	{
 		game = mirror.getGame();
 		self = game.self();
@@ -32,7 +32,7 @@ public class Pinfel_Bot extends DefaultBWListener
 	}
 	
 	@Override
-	public void OnFrame()
+	public void onFrame()
 	{
 	
 	}
