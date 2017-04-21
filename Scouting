@@ -1,1 +1,7 @@
+HashSet<Position> startLocationSet = new HashSet<Position>();
 
+OnStart()
+{
+    for (BaseLocation startLocation : BWTA.getStartLocations())
+    {
+        
