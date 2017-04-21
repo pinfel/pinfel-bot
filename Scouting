@@ -44,8 +44,15 @@ onFrame()
             scoutingProbeFound = false;
             break;
         }
-        
-        
-    }   
+    }
+    
+    for (Position startLocationPosition : startLocationPositionSet)
+    {
+        if (game.startLocationPosition.isExplored())
+        {
+            unexploredStartLocationPositionSet.remove(startLocationPosition);
+            break;
+         }
+     }
 }
     
