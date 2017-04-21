@@ -5,6 +5,7 @@ Boolean scoutingProbeActive = false;
 Boolean enemyBaseFound = false;
 Unit scoutingProbe = null;
 Position closestUnexploredStartLocation = null;
+Position enemyBasePosition = null;
 
 onStart()
 {
@@ -70,6 +71,13 @@ onFrame()
         {
             unexploredStartLocationPositionSet.remove(startLocationPosition);
             break;
+         }
+         
+         TilePosition tileCorrespondingToStartLocationPosition = new TilePosition (startLocationPosition.getX()/32, startLocationPosition.getY()/32);
+         if (tileCorrespondingToStartLocationPosition.contains(game.enemy().isBuilding() && !enemyBaseFound)
+         {
+             enemyBasePosition = tileCorrespondingToStartLocationPosition.toPosition();
+             enemyBaseFound = true;
          }
      }
 }
