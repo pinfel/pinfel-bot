@@ -1,1 +1,28 @@
+import java.util.*;
+import bwapi.*;
+import bwta.BWTA;
+import bwta.BaseLocation;
 
+public class Pinfel_Bot extends DefaultBWListener
+{
+	private Mirror mirror = new Mirror();
+	private Game game;
+	private Player self;
+	public void run()
+	{
+		mirror.getModule().setEventListener(this);
+		mirror.startGame();
+	}
+	
+	public void OnStart()
+	{
+		game = mirror.getGame();
+		self = game.self();
+		game.setLocalSpeed(20);
+		game.setLatCom(false);
+		
+		BWTA.readMap();
+		BWTA.analyze();		
+	}
+	
+	
