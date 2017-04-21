@@ -5,7 +5,7 @@ import bwta.BaseLocation;
 
 public class Pinfel_Bot extends DefaultBWListener
 {
-	public static void main(Strings[] args)
+	public static void main(String[] args)
 	{
 		new Pinfel_Bot().run();
 	}
