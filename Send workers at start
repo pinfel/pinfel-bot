@@ -6,7 +6,7 @@ Set<Unit> baseMinerals = new HashSet<Unit>();
 onFrame() {
     for (Unit myUnit : self.getUnits()) {
         if (myUnit.getType() == UnitType.Protoss_Pylon) {
-            for (Unit neutralUnit : game.getNeutralUnits() {
+            for (Unit neutralUnit : game.getNeutralUnits()) {
                 if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
                     if (myUnit.getDistance(neutralUnit.getPosition) < 200) {
                         baseMinerals.add(neutralUnit);
@@ -17,7 +17,9 @@ onFrame() {
         
         if (myUnit.getType() == UnitType.Protoss_Probe) {
             if (myUnit.isIdle()) {
-                
+            
+            }          
+        }               
     }
 }
                         
