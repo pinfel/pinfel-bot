@@ -1,1 +1,19 @@
+//goal: send initial workers to unique mineral patches on game start
 
+//contain all minerals that are within range of an ally nexus
+Set<Unit> baseMinerals = new HashSet<Unit>();
+
+onFrame() {
+    for (Unit myUnit : self.getUnits()) {
+        if (myUnit.getType == UnitType.Protoss_Pylon) {
+            for (Unit neutralUnit : game.getNeutralUnits() {
+                if (neutralUnit.getType == UnitType.Resource_Mineral_Field) {
+                    if (myUnit.getDistance(neutralUnit.getPosition) < 200) {
+                        baseMinerals.add(neutralUnit);
+                    }
+                }
+            }
+        }
+    }
+}
+                        
