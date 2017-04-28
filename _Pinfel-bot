@@ -23,16 +23,60 @@ public class Pinfel_Bot extends DefaultBWListener {
 	public void onStart() {
 		game = mirror.getGame();
 		self = game.self();
-		game.setLocalSpeed(20);
+		game.setLocalSpeed(15);
 		game.setLatCom(false);
 		
 		BWTA.readMap();
 		BWTA.analyze();		
 	}
 	
+	//find suitable build tile according to building type - taken from example bot
+	public TilePosition getBuildTile(Unit builder, UnitType buildingType, TilePosition aroundTile) {
+		TilePosition ret = null;
+		int maxDist = 3;
+		int stopDist = 40;
+
+		// Refinery, Assimilator, Extractor
+		if (buildingType.isRefinery()) {
+			for (Unit n : game.neutral().getUnits()) {
+				if ((n.getType() == UnitType.Resource_Vespene_Geyser) &&
+						( Math.abs(n.getTilePosition().getX() - aroundTile.getX()) < stopDist ) &&
+						( Math.abs(n.getTilePosition().getY() - aroundTile.getY()) < stopDist )
+						) return n.getTilePosition();
+			}
+		}
+
+		while ((maxDist < stopDist) && (ret == null)) {
+			for (int i=aroundTile.getX()-maxDist; i<=aroundTile.getX()+maxDist; i++) {
+				for (int j=aroundTile.getY()-maxDist; j<=aroundTile.getY()+maxDist; j++) {
+					if (game.canBuildHere(new TilePosition(i,j), buildingType, builder, false)) {
+						// units that are blocking the tile
+						boolean unitsInWay = false;
+						for (Unit u : game.getAllUnits()) {
+							if (u.getID() == builder.getID()) continue;
+							if ((Math.abs(u.getTilePosition().getX()-i) < 4) && (Math.abs(u.getTilePosition().getY()-j) < 4)) unitsInWay = true;
+						}
+						if (!unitsInWay) {
+							return new TilePosition(i, j);
+						}		
+					}
+				}
+			}
+			maxDist += 2;
+		}
+
+		if (ret == null) game.printf("Unable to find suitable build position for "+buildingType.toString());
+		return ret;
+	}
+	
 	@Override
 	public void onFrame() {
+		
+		game.drawTextScreen(10, 10, "Frame count: " + game.getFrameCount());
+		
 		for (Unit myUnit : self.getUnits()) {
+			
+			//nexus
 	        if (myUnit.getType() == UnitType.Protoss_Nexus) {
 	            for (Unit neutralUnit : game.getNeutralUnits()) {
 	                if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
@@ -42,13 +86,17 @@ public class Pinfel_Bot extends DefaultBWListener {
 	                }
 	            }
 	            
-	            if (self.minerals() >= 50 && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && !myUnit.isTraining()) {
+	            if (self.minerals() >= 50 && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && !myUnit.isTraining()
+	            		&& self.allUnitCount(UnitType.Protoss_Nexus)*21 > self.allUnitCount(UnitType.Protoss_Probe)) {
 	            	myUnit.build(UnitType.Protoss_Probe);
 	            }
 	        }
 	        
-	        if (myUnit.getType() == UnitType.Protoss_Probe) {
-	            if (myUnit.isIdle()) {
+	        //probe
+	        if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()) {
+	        	
+	        	//get workers to mine minerals if not doing anything after a while
+	            if (myUnit.isIdle() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3) {
 	            	for (Unit minerals : baseMinerals) {
 	            		myUnit.gather(minerals);
 	            		baseMinerals.remove(minerals);
@@ -56,15 +104,86 @@ public class Pinfel_Bot extends DefaultBWListener {
 	            	}
 	            }
 	            
-	            if (self.allUnitCount(UnitType.Protoss_Pylon)*8 + self.allUnitCount(UnitType.Protoss_Nexus)*9 - (self.supplyUsed()/2 + self.allUnitCount(UnitType.Protoss_Nexus)
-	            	+ self.allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) {
-	            	for (int x = 0; x <= 40; x++) {
-	            		for (int y = 0; y <= 40; y++) {
-	            			TilePosition pylonPlacement = new TilePosition (x, y);
-	            		}
+	            //pylon builder (issue: lagg is caused when <100 minerals as bot keeps trying to find buildTile)
+	            if (9 + self.allUnitCount(UnitType.Protoss_Pylon)*8 + (self.completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - 
+	            		(self.supplyUsed()/2 + self.allUnitCount(UnitType.Protoss_Nexus) + self.allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) {
+	            	
+	            	TilePosition buildTile = getBuildTile(myUnit, UnitType.Protoss_Pylon, self.getStartLocation());
+
+	            	if (buildTile != null && self.minerals() >= 100) {
+	    				myUnit.build(UnitType.Protoss_Pylon, buildTile);
+	    				break;
 	            	}
 	            }
+	            
+	            //gas builder (incomplete: need to change self.getStartLocation() to n'th closest base)
+	            if (self.allUnitCount(UnitType.Protoss_Assimilator) < self.completedUnitCount(UnitType.Protoss_Nexus) 
+	            		&& self.allUnitCount(UnitType.Protoss_Probe) >= 12) {
+	            	TilePosition gasTile = getBuildTile(myUnit, UnitType.Protoss_Assimilator, self.getStartLocation());
+	            	if (gasTile != null && self.minerals() >= 75) {
+	    				myUnit.build(UnitType.Protoss_Assimilator, gasTile);
+	    				break;
+	            	}
+	            }
+	            
+	            //first gateway
+	            if (self.minerals() >= 150 && self.allUnitCount(UnitType.Protoss_Gateway) == 0 && self.completedUnitCount(UnitType.Protoss_Pylon) >= 1) {
+	            	TilePosition firstGatewayTile = getBuildTile(myUnit, UnitType.Protoss_Gateway, self.getStartLocation());
+	            	if (firstGatewayTile != null) {
+	    				myUnit.build(UnitType.Protoss_Gateway, firstGatewayTile);
+	    				break;
+	            	}
+	            }
+	            
+	            //cybernetics core
+	            if (self.minerals() >= 200 && self.allUnitCount(UnitType.Protoss_Cybernetics_Core) == 0 && self.completedUnitCount(UnitType.Protoss_Gateway) >= 1) {
+	            	TilePosition cyberneticsTile = getBuildTile(myUnit, UnitType.Protoss_Cybernetics_Core, self.getStartLocation());
+	            	if (cyberneticsTile != null) {
+	    				myUnit.build(UnitType.Protoss_Cybernetics_Core, cyberneticsTile);
+	    				break;
+	            	}
+	            }
+	            
+	            //gateways after core
+	            if (self.minerals() >=180 && self.allUnitCount(UnitType.Protoss_Nexus)*3 > self.allUnitCount(UnitType.Protoss_Gateway)
+	            		&& self.allUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1) {
+	            	TilePosition otherGatewayTile = getBuildTile(myUnit, UnitType.Protoss_Gateway, self.getStartLocation());
+	            	if (otherGatewayTile != null) {
+	    				myUnit.build(UnitType.Protoss_Gateway, otherGatewayTile);
+	    				break;
+	            	}
+	            }
+	            
+	            //nexus builder
+	            //if (self.allUnitCount(UnitType.Protoss_Nexus)*21 <= self.allUnitCount(UnitType.Protoss_Probe)) {
+	            //	if (self.minerals() >= 400) {
+	            //		//myUnit build nexus at closest base location
+	            //	}
+	            //}
 	        }
+	        
+	        //gateway
+	        if (myUnit.getType() == UnitType.Protoss_Gateway) {
+	        	if (self.minerals() >= 100 && !myUnit.isTraining() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3) {
+	        		myUnit.build(UnitType.Protoss_Zealot);
+	        	}
+	        }
+	        
+	        //send probes to gas (incomplete)
+	        if (myUnit.getType() == UnitType.Protoss_Assimilator && myUnit.isCompleted()) {
+	            int guysInGas = 0;
+        		game.drawCircleMap(myUnit.getPosition(), 175, Color.Red);
+        		
+        		for (Unit nearbyProbes : myUnit.getUnitsInRadius(175)) {
+        			if (nearbyProbes.getType() == UnitType.Protoss_Probe && nearbyProbes.isGatheringGas()) {
+        				++guysInGas;
+        			}
+        			if (guysInGas >= 3) {
+            			break;
+            		}
+            		game.drawTextMap(myUnit.getPosition(), "In gas: " + guysInGas);
+        		}   
+        	}	           
 	    }
 	}	
 }
