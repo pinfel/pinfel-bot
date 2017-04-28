@@ -17,7 +17,7 @@ public class Pinfel_Bot extends DefaultBWListener {
 	}	
 	
 	//contain all minerals that are within range of an ally nexus
-	Set<Unit> baseMinerals = new HashSet<Unit>();
+	Set<Unit> baseMinerals = new HashSet<Unit>();	
 	
 	@Override
 	public void onStart() {
@@ -27,7 +27,9 @@ public class Pinfel_Bot extends DefaultBWListener {
 		game.setLatCom(false);
 		
 		BWTA.readMap();
-		BWTA.analyze();		
+		BWTA.analyze();	
+		
+		
 	}
 	
 	//find suitable build tile according to building type - taken from example bot
@@ -73,11 +75,12 @@ public class Pinfel_Bot extends DefaultBWListener {
 	public void onFrame() {
 		
 		game.drawTextScreen(10, 10, "Frame count: " + game.getFrameCount());
-		
-		for (Unit myUnit : self.getUnits()) {
+		//for my units:
+		for (Unit myUnit : self.getUnits()) {		
 			
 			//nexus
 	        if (myUnit.getType() == UnitType.Protoss_Nexus) {
+	        	//add minerals nearby nexus into a list of 'safe' minerals
 	            for (Unit neutralUnit : game.getNeutralUnits()) {
 	                if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
 	                    if (myUnit.getDistance(neutralUnit.getPosition()) < 300) {
@@ -85,7 +88,7 @@ public class Pinfel_Bot extends DefaultBWListener {
 	                    }
 	                }
 	            }
-	            
+	            //train workers
 	            if (self.minerals() >= 50 && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && !myUnit.isTraining()
 	            		&& self.allUnitCount(UnitType.Protoss_Nexus)*21 > self.allUnitCount(UnitType.Protoss_Probe)) {
 	            	myUnit.build(UnitType.Protoss_Probe);
@@ -102,13 +105,18 @@ public class Pinfel_Bot extends DefaultBWListener {
 	            		baseMinerals.remove(minerals);
 	            		break;
 	            	}
-	            }
+	            }	          
 	            
-	            //pylon builder (issue: lagg is caused when <100 minerals as bot keeps trying to find buildTile)
+	            //pylon builder 
 	            if (9 + self.allUnitCount(UnitType.Protoss_Pylon)*8 + (self.completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - 
 	            		(self.supplyUsed()/2 + self.allUnitCount(UnitType.Protoss_Nexus) + self.allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) {
 	            	
 	            	TilePosition buildTile = getBuildTile(myUnit, UnitType.Protoss_Pylon, self.getStartLocation());
+	            	
+	            	if (buildTile != null && myUnit.getDistance(buildTile.toPosition()) > 25) {
+	    				myUnit.move(buildTile.toPosition());
+	    				break;
+	            	}
 
 	            	if (buildTile != null && self.minerals() >= 100) {
 	    				myUnit.build(UnitType.Protoss_Pylon, buildTile);
@@ -162,18 +170,29 @@ public class Pinfel_Bot extends DefaultBWListener {
 	            //}
 	        }
 	        
-	        //gateway
+	        //gateway (stop training when want to expand, but can train if floating excess amount of minerals)
 	        if (myUnit.getType() == UnitType.Protoss_Gateway) {
-	        	if (self.minerals() >= 100 && !myUnit.isTraining() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3) {
-	        		myUnit.build(UnitType.Protoss_Zealot);
+	        	if (self.minerals() >= 125 && !myUnit.isTraining() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3) {
+	        		if (self.gas() >50 && self.completedUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1 
+	        				&& self.allUnitCount(UnitType.Protoss_Dragoon) <= self.allUnitCount(UnitType.Protoss_Zealot)) {
+	        			myUnit.build(UnitType.Protoss_Dragoon);
+	        		}
+	        		else {
+	        			myUnit.build(UnitType.Protoss_Zealot);
+	        		}
 	        	}
 	        }
 	        
-	        //send probes to gas (incomplete)
+	        //cybernetics core (research singularity charge)
+	        if (myUnit.getType() == UnitType.Protoss_Cybernetics_Core) {
+	        	if (self.minerals() >= 200 && self.gas() >= 200 && myUnit.canUpgrade(UpgradeType.Singularity_Charge)) {
+	        		myUnit.upgrade(UpgradeType.Singularity_Charge);
+	        	}
+	        }
+	        
+	        //send probes to gas (incomplete) (note: don't think guy inside assimilator counts as gathering gas)
 	        if (myUnit.getType() == UnitType.Protoss_Assimilator && myUnit.isCompleted()) {
-	            int guysInGas = 0;
-        		game.drawCircleMap(myUnit.getPosition(), 175, Color.Red);
-        		
+	            int guysInGas = 0;       		
         		for (Unit nearbyProbes : myUnit.getUnitsInRadius(175)) {
         			if (nearbyProbes.getType() == UnitType.Protoss_Probe && nearbyProbes.isGatheringGas()) {
         				++guysInGas;
@@ -181,8 +200,25 @@ public class Pinfel_Bot extends DefaultBWListener {
         			if (guysInGas >= 3) {
             			break;
             		}
-            		game.drawTextMap(myUnit.getPosition(), "In gas: " + guysInGas);
         		}   
+        		if (guysInGas < 3) {
+        			int numGuysToSend = 3 - guysInGas;
+        			Set<Unit> guysToSend = new HashSet<Unit>();
+        			for (Unit workers : self.getUnits()) {
+        				if (workers.getType() == UnitType.Protoss_Probe && workers.isCompleted() && guysToSend.size() < numGuysToSend) {
+        					guysToSend.add(workers);
+        				}
+        				if (guysToSend.size() == numGuysToSend) {
+        					for (Unit sendingGuys : guysToSend) {
+        						sendingGuys.gather(myUnit);
+        						if (!sendingGuys.exists()) {
+        							guysToSend.remove(sendingGuys);
+        						}
+        						continue;
+        					}
+        				}
+        			}
+        		}
         	}	           
 	    }
 	}	
