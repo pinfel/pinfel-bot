@@ -1,0 +1,11 @@
+/*
+base builder and sxouting probe are disabled permanently if killed
+
+workers try to gather from used mineral patches when there are free ones available
+
+building gas geyser currently only works for starting location
+
+expansions cannot be built properly and does not build to closest base
+
+
+*/
