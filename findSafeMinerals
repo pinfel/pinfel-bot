@@ -1,0 +1,31 @@
+//DEBUGGING PURPOSES
+		//** Draws a red circle for each mineral field that is considered 'safe'. **
+		for (Unit safeMineral : safeMinerals) {
+			game.drawCircleMap(safeMineral.getPosition(), 20, Color.Red);
+		}
+		
+		//ON-FRAME :: ITERATE OVER NEUTRAL UNITS
+		for (Unit neutralUnit : game.getNeutralUnits()) {
+			
+			//ON-FRAME :: ITERATE OVER NEUTRAL UNITS :: IF MINERAL FIELD
+			//** Adds mineral field to set of 'safe' minerals if close enough to Nexus. Removes from set if it no longer meets criteria. **
+			if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
+				int safeMineralDist = 250;
+				for (Unit myNexus : self.getUnits()) {
+					if (myNexus.getType() == UnitType.Protoss_Nexus && myNexus.isCompleted() && neutralUnit.getDistance(myNexus.getPosition()) < safeMineralDist) {
+						safeMinerals.add(neutralUnit);
+					}			
+				}
+				if (safeMinerals.contains(neutralUnit)) {
+					Boolean mineralStillSafe = false;
+					for (Unit myNexus : self.getUnits()) {
+						if (myNexus.getType() == UnitType.Protoss_Nexus && myNexus.isCompleted() && neutralUnit.getDistance(myNexus.getPosition()) < safeMineralDist) {
+							mineralStillSafe = true;
+						}	
+					}
+					if (mineralStillSafe == false) {
+						safeMinerals.remove(neutralUnit);
+					}
+				}
+			}
+		}
