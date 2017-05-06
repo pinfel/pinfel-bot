@@ -1,1 +1,22 @@
+Set<Unit> mineralsCloseToNexus = new HashSet<Unit>();
+
+onFrame() {
+    for (Unit neutralUnit : game.getNeutralUnits) {
+        if (neutralUnit.getType().isMineralField()) {
+            Boolean mineralStillCloseToNexus = false;
+            for (Unit myUnit : self.getUnits()) {
+                if (myUnit.getType == UnitType.Protoss_Nexus && myUnit.isCompleted()) {
+                    if (neutralUnit.getDistance(myUnit.getPosition() <= 200) {
+                        mineralsCloseToNexus.add(neutralUnit);
+                        mineralStillCloseToNexus = true;
+                    }
+                }
+            }
+            if (mineralStillCloseToNexus = false) {
+                mineralsCloseToNexus.remove(neutralUnit);
+            }
+        }
+    }
+}
+
 
