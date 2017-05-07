@@ -1,0 +1,575 @@
+import java.util.*;
+import bwapi.*;
+import bwta.BWTA;
+import bwta.BaseLocation;
+
+public class TestBot1 extends DefaultBWListener {
+	public static void main(String[] args) {
+		new TestBot1().run();
+	}
+	
+	private Mirror mirror = new Mirror();
+	private Game game;
+	private Player self;
+	public void run() {
+		mirror.getModule().setEventListener(this);
+		mirror.startGame();
+	}	
+	
+	//pylon builder
+	public void buildPylon(int xDisplacement, int yDisplacement, int supplyNumActivate) {
+		if (self.supplyUsed()/2 >= supplyNumActivate) {
+			Unit closestProbeToPylon = null;
+			TilePosition pylonLocation = new TilePosition (initialNexus.getX()/32 + xDisplacement, initialNexus.getY()/32 + yDisplacement);
+			game.drawCircleMap(pylonLocation.toPosition(), 3, Color.Green);
+			for (Unit myUnit : self.getUnits()) {
+				if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+						&& !myUnit.isGatheringGas()) {
+					if (closestProbeToPylon == null || myUnit.getDistance(pylonLocation.toPosition()) < closestProbeToPylon.getDistance(pylonLocation.toPosition())) {
+						closestProbeToPylon = myUnit;
+					}
+				}
+				}
+			if (self.minerals() < 100) {
+				closestProbeToPylon.move(pylonLocation.toPosition());
+			}
+			else {
+				TilePosition pylonLocationBuild = new TilePosition (pylonLocation.getX() - 1, pylonLocation.getY() - 1);
+				closestProbeToPylon.build(UnitType.Protoss_Pylon, pylonLocationBuild);
+			}
+		}
+	}
+	
+	//find suitable build tile according to building type - taken from example bot
+		public TilePosition getBuildTile(Unit builder, UnitType buildingType, TilePosition aroundTile) {
+			TilePosition ret = null;
+			int maxDist = 3;
+			int stopDist = 40;
+
+			while ((maxDist < stopDist) && (ret == null)) {
+				for (int i=aroundTile.getX()-maxDist; i<=aroundTile.getX()+maxDist; i++) {
+					for (int j=aroundTile.getY()-maxDist; j<=aroundTile.getY()+maxDist; j++) {
+						if (game.canBuildHere(new TilePosition(i,j), buildingType, builder, false)) {
+							// units that are blocking the tile
+							boolean unitsInWay = false;
+							for (Unit u : game.getAllUnits()) {
+								if (u.getID() == builder.getID()) continue;
+								if ((Math.abs(u.getTilePosition().getX()-i) < 4) && (Math.abs(u.getTilePosition().getY()-j) < 4)) unitsInWay = true;
+							}
+							if (!unitsInWay) {
+								return new TilePosition(i, j);
+							}		
+						}
+					}
+				}
+				maxDist += 2;
+			}
+
+			if (ret == null) game.printf("Unable to find suitable build position for "+buildingType.toString());
+			return ret;
+		}
+	
+	Boolean buildOrderInProgress = true;
+	Set<Unit> mineralToMine = new HashSet<Unit>();
+	Set<Unit> mineralToNotMine = new HashSet<Unit>();
+	Unit initialNexus = null;
+	TilePosition copyGatewayTile = null;
+	Boolean scoutingProbeFound = false;
+	Unit scoutingProbe = null;
+	Boolean enemyBaseFound = false;
+	Position enemyBasePosition;
+	Set<Unit> visibleEnemies = new HashSet<Unit>();
+
+	
+	
+	public Boolean noCommandForAWhile(Unit unit) {
+		if (game.getFrameCount() - unit.getLastCommandFrame() > 3) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//START
+	@Override
+	public void onStart() {
+		game = mirror.getGame();
+		self = game.self();
+		game.setLocalSpeed(15);
+		game.setLatCom(false);
+		game.enableFlag(1);
+		
+		BWTA.readMap();
+		BWTA.analyze();		
+		
+		//identify initial nexus for easier calling
+		for (Unit myUnit : self.getUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Nexus && myUnit.isCompleted()) {
+				initialNexus = myUnit;
+			}
+		}
+	}
+			
+	//ON-FRAME
+	@Override
+	public void onFrame() {
+
+		if (buildOrderInProgress) {
+			
+			//gather list of enemy units
+			for (Unit enemyUnits : game.enemy().getUnits()) {
+				if (enemyUnits.isVisible()) {
+					visibleEnemies.add(enemyUnits);
+				}
+			}
+			for (Unit visibleEnemy : visibleEnemies) {
+				if (!visibleEnemy.isVisible()) {
+					visibleEnemies.remove(visibleEnemy);
+				}
+			}
+			
+			//assign scouting probe on start
+			for (Unit myUnit : self.getUnits()) {
+				if (myUnit.getType() == UnitType.Protoss_Probe) {
+					if (scoutingProbeFound == false) {
+		        		scoutingProbe = myUnit;
+		        		scoutingProbeFound = true;
+		        	}
+				}
+				//dragoon behavior
+				if (myUnit.getType() == UnitType.Protoss_Dragoon) {
+					if (enemyBaseFound) {
+						if (game.getFrameCount()%50 == 0 && myUnit.getDistance(enemyBasePosition) > 500) {
+							myUnit.attack(enemyBasePosition);
+						}
+						if (game.getFrameCount()%50 == 0 && myUnit.getDistance(enemyBasePosition) <= 500) {
+							for (Unit enemyUnit : visibleEnemies) {
+								TilePosition enemyTile = new TilePosition (enemyUnit.getX()/32, enemyUnit.getY()/32);
+								myUnit.attack(enemyTile.toPosition());
+							}
+						}
+						if ((game.getFrameCount()+35)%50 == 0) {
+							for (Unit enemyUnit : visibleEnemies) {
+								if (self.supplyUsed()/2 >= 57) {
+									myUnit.move(enemyBasePosition);
+								}
+								else {
+									if (myUnit.getUnitsInRadius(155).contains(enemyUnit)) {
+										myUnit.move(initialNexus.getPosition());
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			//clear mineral to not mine when full
+			if (mineralToNotMine.size() == self.completedUnitCount(UnitType.Protoss_Nexus)*9) {
+				mineralToNotMine.clear();
+			}
+			
+			//color coded minerals
+			for (Unit mineralToMine : mineralToMine) {
+				if (mineralToNotMine.contains(mineralToMine)) {
+					game.drawCircleMap(mineralToMine.getPosition(), 16, Color.Red);
+				}
+				else {
+					game.drawCircleMap(mineralToMine.getPosition(), 16, Color.Green);
+				}
+				
+			}
+			
+			//for all my buildings, draw a show and draw a dot on its position
+			for (Unit myUnit : self.getUnits()) {
+				if (myUnit.getType().isBuilding()) {
+					game.drawCircleMap(myUnit.getPosition(), 3, Color.Red);
+					game.drawTextMap(myUnit.getPosition(), myUnit.getX()/32 + ", " + myUnit.getY()/32);
+				}
+				
+				//when worker is idle, go mine a mineral
+				if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()) {
+
+					if (myUnit.isIdle() && noCommandForAWhile(myUnit)) {
+						Unit closestMineralToMine = null;
+						for (Unit mineralToMine : mineralToMine) {
+							if (!mineralToNotMine.contains(mineralToMine)) {
+								if (closestMineralToMine == null || myUnit.getDistance(mineralToMine) < myUnit.getDistance(closestMineralToMine)) {
+									closestMineralToMine = mineralToMine;
+								}
+							}
+						}
+						if (!myUnit.canReturnCargo()) {
+							myUnit.gather(closestMineralToMine);
+							mineralToNotMine.add(closestMineralToMine);
+						}
+						else {
+							myUnit.returnCargo();
+							myUnit.gather(closestMineralToMine, true);
+							mineralToNotMine.add(closestMineralToMine);
+						}
+					}
+				}
+				
+				//add mineral fields sufficiently close to nexus to minerals to mine
+				if (myUnit.getType() == UnitType.Protoss_Nexus && myUnit.isCompleted()) {
+					for (Unit neutralUnit : game.getNeutralUnits()) {
+						if (neutralUnit.getType().isMineralField() && neutralUnit.getDistance(myUnit) < 250) {
+							mineralToMine.add(neutralUnit);
+						}
+					}
+					
+					//BO process #1 :: keep building workers until (19)
+					int numOfProbesToMake = 19;
+					if (self.allUnitCount(UnitType.Protoss_Probe) < numOfProbesToMake && noCommandForAWhile(myUnit) && !myUnit.isTraining()) {
+						myUnit.build(UnitType.Protoss_Probe);
+					}
+				}
+			}
+			
+			//BO process #2 :: when we have 8 workers, build a pylon : in a position to help gas mining
+			if (self.allUnitCount(UnitType.Protoss_Probe) >= 8 && self.allUnitCount(UnitType.Protoss_Pylon) == 0) {
+				Unit closestProbeToPylon = null;
+				TilePosition pylonLocation = new TilePosition (initialNexus.getX()/32 - 1, initialNexus.getY()/32 - 3);
+				game.drawCircleMap(pylonLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted() && myUnit != scoutingProbe) {
+						if (closestProbeToPylon == null || myUnit.getDistance(pylonLocation.toPosition()) < closestProbeToPylon.getDistance(pylonLocation.toPosition())) {
+							closestProbeToPylon = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 100) {
+					closestProbeToPylon.move(pylonLocation.toPosition());
+				}
+				else {
+					TilePosition pylonLocationBuild = new TilePosition (pylonLocation.getX() - 1, pylonLocation.getY() - 1);
+					closestProbeToPylon.build(UnitType.Protoss_Pylon, pylonLocationBuild);
+				}
+			}
+			
+			//BO process #3 :: when we have 10 workers, build gateway
+			if (self.allUnitCount(UnitType.Protoss_Probe) >= 10 && self.completedUnitCount(UnitType.Protoss_Pylon) >= 1 && self.allUnitCount(UnitType.Protoss_Gateway) == 0) {
+				Unit closestProbeToGateway = null;
+				TilePosition gatewayLocation;
+				TilePosition isBuildable1 = new TilePosition (initialNexus.getX()/32 - 6, initialNexus.getY()/32 - 1);
+				TilePosition isBuildable2 = new TilePosition (initialNexus.getX()/32 - 6, initialNexus.getY()/32 + 1);
+				TilePosition isBuildable3 = new TilePosition (initialNexus.getX()/32 - 6, initialNexus.getY()/32);
+				TilePosition isBuildable4 = new TilePosition (initialNexus.getX()/32 - 6, initialNexus.getY()/32 - 2);
+				TilePosition isBuildable5 = new TilePosition (initialNexus.getX()/32 - 6, initialNexus.getY()/32 + 2);
+				
+				game.drawCircleMap(isBuildable1.toPosition(), 3,  Color.Red);
+				game.drawTextMap(isBuildable1.toPosition(), "" + game.isBuildable(isBuildable1, true));
+				game.drawCircleMap(isBuildable2.toPosition(), 3, Color.Red);
+				game.drawTextMap(isBuildable2.toPosition(), "" + game.isBuildable(isBuildable2, true));
+				game.drawCircleMap(isBuildable3.toPosition(), 3,  Color.Red);
+				game.drawTextMap(isBuildable3.toPosition(), "" + game.isBuildable(isBuildable1, true));
+				game.drawCircleMap(isBuildable4.toPosition(), 3, Color.Red);
+				game.drawTextMap(isBuildable4.toPosition(), "" + game.isBuildable(isBuildable2, true));
+				game.drawCircleMap(isBuildable5.toPosition(), 3,  Color.Red);
+				game.drawTextMap(isBuildable5.toPosition(), "" + game.isBuildable(isBuildable1, true));
+				
+				if (game.isBuildable(isBuildable1, true) && game.isBuildable(isBuildable2, true) && game.isBuildable(isBuildable3, true)
+						&& game.isBuildable(isBuildable4, true) && game.isBuildable(isBuildable5, true)) {
+					gatewayLocation = new TilePosition (initialNexus.getX()/32 - 4, initialNexus.getY()/32 + 1);
+				}
+				else {
+					gatewayLocation = new TilePosition (initialNexus.getX()/32 + 4, initialNexus.getY()/32 + 1);
+				}
+				copyGatewayTile = gatewayLocation;
+				game.drawCircleMap(gatewayLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe) {
+						if (closestProbeToGateway == null || myUnit.getDistance(gatewayLocation.toPosition()) < closestProbeToGateway.getDistance(gatewayLocation.toPosition())) {
+							closestProbeToGateway = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 150) {
+					closestProbeToGateway.move(gatewayLocation.toPosition());
+				}
+				else {
+					TilePosition gatewayLocationBuild = new TilePosition (gatewayLocation.getX() - 2, gatewayLocation.getY() - 2);
+					closestProbeToGateway.build(UnitType.Protoss_Gateway, gatewayLocationBuild);
+				}
+			}
+			
+			//go scout
+			if (scoutingProbeFound) {
+				if (self.allUnitCount(UnitType.Protoss_Pylon) >= 1) {
+					if (!enemyBaseFound) {
+						for (BaseLocation startLocations : BWTA.getStartLocations()) {
+							TilePosition startLocationTile = new TilePosition (startLocations.getX()/32, startLocations.getY()/32);
+							if (!game.isExplored(startLocationTile)) {
+								scoutingProbe.move(startLocationTile.toPosition());
+							}
+						}
+					}
+					if (enemyBaseFound) {
+						game.drawTextMap(enemyBasePosition, "Enemy base position");
+					}
+				}
+			}
+			if (!enemyBaseFound) {
+				for (Unit enemyUnits : game.enemy().getUnits()) {
+					if (enemyUnits.isVisible() && enemyUnits.getType() == UnitType.Protoss_Nexus ||enemyUnits.getType() == UnitType.Terran_Command_Center
+							|| enemyUnits.getType() == UnitType.Zerg_Hatchery) {
+						enemyBasePosition = enemyUnits.getPosition();
+						enemyBaseFound = true;
+					}
+				}
+			}
+			
+			//BO process #4 :: build gas when we have 12 workers, at least 1 gateway, and 0 gas
+			if (self.allUnitCount(UnitType.Protoss_Probe) >= 12 && self.allUnitCount(UnitType.Protoss_Gateway) >= 1 && self.allUnitCount(UnitType.Protoss_Assimilator) == 0) {
+				Unit closestProbeToGas = null;
+				TilePosition gasLocation = null;
+				for (Unit neutralUnit : game.getNeutralUnits()) {
+					if (neutralUnit.getType() == UnitType.Resource_Vespene_Geyser) {
+						if (initialNexus.getDistance(neutralUnit) < 250) {
+							gasLocation = new TilePosition (neutralUnit.getX()/32, neutralUnit.getY()/32);
+						}
+					}
+				}
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe) {
+						if (closestProbeToGas == null || myUnit.getDistance(gasLocation.toPosition()) < closestProbeToGas.getDistance(gasLocation.toPosition())) {
+							closestProbeToGas = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 100) {
+					closestProbeToGas.move(gasLocation.toPosition());
+				}
+				else {
+					TilePosition gasLocationBuild = new TilePosition (gasLocation.getX() - 2, gasLocation.getY() - 1);
+					closestProbeToGas.build(UnitType.Protoss_Assimilator, gasLocationBuild);
+				}
+			}
+			
+			//BO process #5 :: cybernetics core
+			if (self.allUnitCount(UnitType.Protoss_Probe) >= 13 && self.completedUnitCount(UnitType.Protoss_Gateway) >= 1 
+					&& self.allUnitCount(UnitType.Protoss_Cybernetics_Core) == 0) {
+				Unit closestProbeToCore = null;
+				TilePosition coreLocation = null;
+				
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Gateway) {
+						if (myUnit.getX() < initialNexus.getX() && coreLocation == null) {
+							coreLocation = new TilePosition (initialNexus.getX()/32 - 4, initialNexus.getY()/32 - 5);
+						}
+						else {
+							coreLocation = new TilePosition (initialNexus.getX()/32 + 5, initialNexus.getY()/32 - 5);
+						}
+					}
+				}				
+				game.drawCircleMap(coreLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToCore == null || myUnit.getDistance(coreLocation.toPosition()) < closestProbeToCore.getDistance(coreLocation.toPosition())) {
+							closestProbeToCore = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 200) {
+					closestProbeToCore.move(coreLocation.toPosition());
+				}
+				else {
+					TilePosition coreLocationBuild = new TilePosition (coreLocation.getX() - 2, coreLocation.getY() - 1);
+					closestProbeToCore.build(UnitType.Protoss_Cybernetics_Core, coreLocationBuild);
+				}
+			}
+			
+			//BO process #7 :: make 2nd pylon
+			if (self.allUnitCount(UnitType.Protoss_Probe) >= 15 && self.allUnitCount(UnitType.Protoss_Pylon) == 1) {
+				Unit closestProbeToPylon = null;
+				TilePosition pylonLocation = new TilePosition (initialNexus.getX()/32 + 1, initialNexus.getY()/32 + 3);
+				game.drawCircleMap(pylonLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToPylon == null || myUnit.getDistance(pylonLocation.toPosition()) < closestProbeToPylon.getDistance(pylonLocation.toPosition())) {
+							closestProbeToPylon = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 100) {
+					closestProbeToPylon.move(pylonLocation.toPosition());
+				}
+				else {
+					TilePosition pylonLocationBuild = new TilePosition (pylonLocation.getX() - 1, pylonLocation.getY() - 1);
+					closestProbeToPylon.build(UnitType.Protoss_Pylon, pylonLocationBuild);
+				}
+			}
+			
+			//BO process #8 :: make 3 more gateways
+			if (self.allUnitCount(UnitType.Protoss_Dragoon) >= 2 && self.allUnitCount(UnitType.Protoss_Gateway) == 1) {
+				Unit closestProbeToGate = null;
+				TilePosition gateLocation = new TilePosition (copyGatewayTile.getX(), copyGatewayTile.getY() + 3);
+				game.drawCircleMap(gateLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToGate == null || myUnit.getDistance(gateLocation.toPosition()) < closestProbeToGate.getDistance(gateLocation.toPosition())) {
+							closestProbeToGate = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 150) {
+					closestProbeToGate.move(gateLocation.toPosition());
+				}
+				else {
+					TilePosition gateLocationBuild = new TilePosition (gateLocation.getX() - 2, gateLocation.getY() - 2);
+					closestProbeToGate.build(UnitType.Protoss_Gateway, gateLocationBuild);
+				}
+			}
+			if (self.allUnitCount(UnitType.Protoss_Dragoon) >= 2 && self.allUnitCount(UnitType.Protoss_Gateway) == 2) {
+				Unit closestProbeToGate = null;
+				TilePosition gateLocation = new TilePosition (copyGatewayTile.getX(), copyGatewayTile.getY() + 6);
+				game.drawCircleMap(gateLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToGate == null || myUnit.getDistance(gateLocation.toPosition()) < closestProbeToGate.getDistance(gateLocation.toPosition())) {
+							closestProbeToGate = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 150) {
+					closestProbeToGate.move(gateLocation.toPosition());
+				}
+				else {
+					TilePosition gateLocationBuild = new TilePosition (gateLocation.getX() - 2, gateLocation.getY() - 2);
+					closestProbeToGate.build(UnitType.Protoss_Gateway, gateLocationBuild);
+				}
+			}
+			if (self.allUnitCount(UnitType.Protoss_Dragoon) >= 2 && self.allUnitCount(UnitType.Protoss_Gateway) == 3) {
+				Unit closestProbeToGate = null;
+				TilePosition gateLocation = new TilePosition (copyGatewayTile.getX(), copyGatewayTile.getY() - 3);
+				game.drawCircleMap(gateLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted() && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToGate == null || myUnit.getDistance(gateLocation.toPosition()) < closestProbeToGate.getDistance(gateLocation.toPosition())) {
+							closestProbeToGate = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 150) {
+					closestProbeToGate.move(gateLocation.toPosition());
+				}
+				else {
+					TilePosition gateLocationBuild = new TilePosition (gateLocation.getX() - 2, gateLocation.getY() - 2);
+					closestProbeToGate.build(UnitType.Protoss_Gateway, gateLocationBuild);
+				}
+			}
+			
+			//send guys to gas
+			for (Unit myUnit : self.getUnits()) {
+				if (myUnit.getType() == UnitType.Protoss_Assimilator && myUnit.isCompleted()) {
+		            int guysInGas = 0;       		
+	        		for (Unit nearbyProbes : myUnit.getUnitsInRadius(175)) {
+	        			if (nearbyProbes.getType() == UnitType.Protoss_Probe && nearbyProbes.isGatheringGas()) {
+	        				++guysInGas;
+	        			}
+	        			if (guysInGas >= 3) {
+	            			break;
+	            		}
+	        		}   
+	        		if (guysInGas < 3) {
+	        			int numGuysToSend = 3 - guysInGas;
+	        			Set<Unit> guysToSend = new HashSet<Unit>();
+	        			for (Unit workers : self.getUnits()) {
+	        				if (workers.getType() == UnitType.Protoss_Probe && workers.isCompleted() && guysToSend.size() < numGuysToSend  && workers != scoutingProbe) {
+	        					guysToSend.add(workers);
+	        				}
+	        				if (guysToSend.size() == numGuysToSend) {
+	        					for (Unit sendingGuys : guysToSend) {
+	        						if (!sendingGuys.isGatheringGas()) {
+	        							sendingGuys.gather(myUnit);
+	        						}        						
+	        						if (!sendingGuys.exists()) {
+	        							guysToSend.remove(sendingGuys);
+	        						}
+	        						continue;
+	        					}
+	        				}
+	        			}
+	        		}
+				}
+				
+				//get dragoon range upgrade
+				if (myUnit.getType() == UnitType.Protoss_Cybernetics_Core) {
+					if (myUnit.canUpgrade(UpgradeType.Singularity_Charge) && self.allUnitCount(UnitType.Protoss_Dragoon) >= 1) {
+						myUnit.upgrade(UpgradeType.Singularity_Charge);
+					}
+				}
+				
+				//train dragoons
+				if (myUnit.getType() == UnitType.Protoss_Gateway) {
+					if (self.allUnitCount(UnitType.Protoss_Gateway) < 4 && !myUnit.isTraining() && noCommandForAWhile(myUnit)
+							&& self.allUnitCount(UnitType.Protoss_Dragoon) < 2 && self.minerals() >= 125 && self.gas() >= 50) {
+						myUnit.build(UnitType.Protoss_Dragoon);
+					}
+					if (self.allUnitCount(UnitType.Protoss_Gateway) >= 4 && !myUnit.isTraining() && noCommandForAWhile(myUnit)
+							 && self.minerals() >= 125) {
+						if (self.gas() >= 50) {
+							myUnit.build(UnitType.Protoss_Dragoon);
+						}
+						else {
+							myUnit.build(UnitType.Protoss_Zealot);
+						}
+					}
+				}
+			}
+			
+			//make pylon 3
+			if (self.allUnitCount(UnitType.Protoss_Pylon) == 2 && self.supplyUsed()/2 >= 25) {
+				Unit closestProbeToPylon = null;
+				TilePosition pylonLocation = new TilePosition (initialNexus.getX()/32 - 1, initialNexus.getY()/32 + 3);
+				game.drawCircleMap(pylonLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToPylon == null || myUnit.getDistance(pylonLocation.toPosition()) < closestProbeToPylon.getDistance(pylonLocation.toPosition())) {
+							closestProbeToPylon = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 100) {
+					closestProbeToPylon.move(pylonLocation.toPosition());
+				}
+				else {
+					TilePosition pylonLocationBuild = new TilePosition (pylonLocation.getX() - 1, pylonLocation.getY() - 1);
+					closestProbeToPylon.build(UnitType.Protoss_Pylon, pylonLocationBuild);
+				}
+			}
+			//make pylon 4
+			if (self.allUnitCount(UnitType.Protoss_Pylon) == 3 && self.supplyUsed()/2 >= 33) {
+				Unit closestProbeToPylon = null;
+				TilePosition pylonLocation = new TilePosition (initialNexus.getX()/32 + 1, initialNexus.getY()/32 + 5);
+				game.drawCircleMap(pylonLocation.toPosition(), 3, Color.Green);
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()  && myUnit != scoutingProbe
+							&& !myUnit.isGatheringGas()) {
+						if (closestProbeToPylon == null || myUnit.getDistance(pylonLocation.toPosition()) < closestProbeToPylon.getDistance(pylonLocation.toPosition())) {
+							closestProbeToPylon = myUnit;
+						}
+					}
+ 				}
+				if (self.minerals() < 100) {
+					closestProbeToPylon.move(pylonLocation.toPosition());
+				}
+				else {
+					TilePosition pylonLocationBuild = new TilePosition (pylonLocation.getX() - 1, pylonLocation.getY() - 1);
+					closestProbeToPylon.build(UnitType.Protoss_Pylon, pylonLocationBuild);
+				}
+			}
+			buildPylon(-1, 5, 35);
+			buildPylon(-1, 7, 40);
+			buildPylon(1, 7, 45);
+		}		
+	}	
+}
