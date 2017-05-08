@@ -1,0 +1,44 @@
+//TECH TREE
+		game.drawTextScreen(150, 10, "START");
+		if (self.completedUnitCount(UnitType.Protoss_Assimilator) >= 1) {
+			game.drawLineScreen(185, 17, 200, 17, Color.Green);
+		}
+		else {
+			if (self.allUnitCount(UnitType.Protoss_Assimilator) >= 1) {
+				game.drawLineScreen(185, 17, 200, 17, Color.Yellow);
+			}
+			else {
+				game.drawLineScreen(185, 17, 200, 17, Color.Red);
+			}
+		}
+		game.drawTextScreen(205, 10, "ASSIMILATOR");
+		game.drawTextScreen(120, 35, "NEXUS");
+		game.drawTextScreen(175, 35, "PYLON");
+		if (self.completedUnitCount(UnitType.Protoss_Nexus) >= 1) {
+			game.drawLineScreen(150, 23, 137, 33, Color.Green);
+		}
+		else {
+			if (self.allUnitCount(UnitType.Protoss_Nexus) >= 1) {
+				game.drawLineScreen(150, 23, 137, 33, Color.Yellow);
+			}
+			else {
+				game.drawLineScreen(150, 23, 137, 33, Color.Red);
+			}
+		}
+		
+		if (self.completedUnitCount(UnitType.Protoss_Pylon) >= 1) {
+			game.drawLineScreen(180, 23, 190, 33, Color.Green);
+		}
+		else {
+			if (self.allUnitCount(UnitType.Protoss_Pylon) >= 1) {
+				game.drawLineScreen(180, 23, 190, 33, Color.Yellow);
+			}
+			else {
+				game.drawLineScreen(180, 23, 190, 33, Color.Red);
+			}
+		}
+		
+		game.drawTextScreen(20, 65, "SHIELD BATTERY");
+		game.drawTextScreen(115, 60, "GATEWAY");
+		game.drawTextScreen(175, 60, "FORGE");
+		game.drawTextScreen(230, 65, "PHOTON CANNON");
