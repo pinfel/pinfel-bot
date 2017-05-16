@@ -1,0 +1,219 @@
+package pinfelBot;
+import java.util.*;
+import bwapi.*;
+import bwta.BWTA;
+import bwta.BaseLocation;
+
+public class TestBot1 extends DefaultBWListener {
+	public static void main(String[] args) {
+		new TestBot1().run();
+	}
+	
+	private Mirror mirror = new Mirror();
+	private Game game;
+	private Player self;
+	public void run() {
+		mirror.getModule().setEventListener(this);
+		mirror.startGame();
+	}
+	//expand
+	public void createNexus() {
+		//create list of unoccupied tiles
+		Set<TilePosition> unoccupiedExpandTile = new HashSet<TilePosition>();
+		for (TilePosition expansionTile : expansionTile) {
+			if (game.isBuildable(expansionTile, true)) {
+				unoccupiedExpandTile.add(expansionTile);
+			}
+		}
+		//finding closest unoccupied tile from start position as expand tile
+		TilePosition expandTile = null;
+		for (TilePosition unoccupiedTile : unoccupiedExpandTile) {
+			if (expandTile == null || self.getStartLocation().getDistance(unoccupiedTile) < self.getStartLocation().getDistance(expandTile)) {
+				expandTile = unoccupiedTile;
+			}
+		}
+		//find closest probe from expand tile, then moving it to there
+		Unit probe = getClosestProbe(expandTile);
+		if (!game.isExplored(expandTile)) {
+			probe.move(expandTile.toPosition());
+		}
+		else if (!enoughMoney(UnitType.Protoss_Nexus)) {
+			probe.move(expandTile.toPosition());
+		}
+		else { 
+			probe.build(UnitType.Protoss_Nexus, expandTile);
+		}	
+	}
+	
+	
+	//expansion tile
+	Set<TilePosition> expansionTile = new HashSet<TilePosition>();
+	
+	//gives all minerals that are close to a nexus
+	public Set<Unit> returnSafeMineral() {
+		Set<Unit> safeMineral = new HashSet<Unit>();
+		for (Unit neutralUnit : game.getNeutralUnits()) {
+			if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
+				for (Unit myUnit : self.getUnits()) {
+					if (myUnit.getType() == UnitType.Protoss_Nexus && myUnit.isCompleted()) {
+						if (neutralUnit.getDistance(myUnit.getPosition()) <= 250) {
+							safeMineral.add(neutralUnit);
+						}
+					}
+				}
+			}
+		}
+		return safeMineral;
+	}
+	//return closest probe given a tile
+	public Unit getClosestProbe(TilePosition tile) {
+		Unit closestProbeToTile = null;
+		for (Unit myUnit : self.getUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Probe) {
+				if (closestProbeToTile == null || myUnit.getDistance(tile.toPosition()) < closestProbeToTile.getDistance(tile.toPosition())) {
+					closestProbeToTile = myUnit;
+				}
+			}
+		}
+		return closestProbeToTile;
+	}
+	
+	//gets the center tile of start location
+	public TilePosition selfStartLocation() {
+		return self.getStartLocation();
+	}
+	
+	//return true if there is at least 1 pylon building
+	public Boolean pylonInProgress() {
+		if (self.allUnitCount(UnitType.Protoss_Pylon) > self.completedUnitCount(UnitType.Protoss_Pylon)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//return true if conditions to build a pylon are satisfied
+	public Boolean pylonRequired() {
+		if (self.supplyTotal()/2 >= 200) {
+			return false;
+		}
+		else if (self.supplyTotal()/2 <= 9 && self.supplyTotal()/2 - self.supplyUsed() <= 1 && !pylonInProgress()) {
+			return true;
+		}
+		else if (self.supplyTotal()/2 <= 17 && self.supplyTotal()/2 - self.supplyUsed() <= 2 && !pylonInProgress()) {
+			return true;
+		}
+		else if (self.supplyTotal()/2 <= 25 && self.supplyTotal()/2 - self.supplyUsed() <= 4 && !pylonInProgress()) {
+			return true;
+		}
+		else if (self.supplyTotal()/2 > 25 && (9 + self.allUnitCount(UnitType.Protoss_Pylon)*8 + (self.completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - 
+        		(self.supplyUsed()/2 + self.allUnitCount(UnitType.Protoss_Nexus) + self.allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) 
+				&& self.supplyTotal()/2 != 200) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//return true if we have enough gas and minerals for specific unit type
+	public Boolean enoughMoney(UnitType unitType) {
+		if (self.minerals() >= unitType.mineralPrice() && self.gas() >= unitType.gasPrice()) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//return true if unit has not been given a command for more than 3 frames
+	public Boolean noCommandForAWhile(Unit unit) {
+		if (game.getFrameCount() - unit.getLastCommandFrame() > 3) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//create probes if condition is true
+	public void createProbe(Boolean condition) {
+		if (condition) {
+			for (Unit myUnit : self.getUnits()) {
+				if (myUnit.getType() == UnitType.Protoss_Nexus) {
+					if (noCommandForAWhile(myUnit) && myUnit.isCompleted() && !myUnit.isTraining() && enoughMoney(UnitType.Protoss_Probe)) {
+						myUnit.build(UnitType.Protoss_Probe);
+					}
+				}
+			}
+		}
+	}
+	
+	@Override
+	public void onStart() {
+		game = mirror.getGame();
+		self = game.self();
+		game.setLocalSpeed(15);
+		game.setLatCom(false);
+		game.enableFlag(1);
+		
+		BWTA.readMap();
+		BWTA.analyze();		
+	}
+	
+	
+	@Override
+	public void onFrame() {
+		//**DEBUG: show where choke points are and their width**
+		for (bwta.Chokepoint chokepoint : BWTA.getChokepoints()) {
+			int chokepointWidth = (int) Math.round(chokepoint.getWidth());
+			game.drawCircleMap(chokepoint.getCenter(), chokepointWidth/2, Color.Orange);
+			game.drawTextMap(chokepoint.getCenter(), "" + chokepointWidth/2);
+		}
+		
+		//**DEBUG: show base locations**
+		for (BaseLocation baseLocation : BWTA.getBaseLocations()) {
+			TilePosition upperLeftTile = new TilePosition (baseLocation.getX()/32 - 2, baseLocation.getY()/32 - 1);
+			expansionTile.add(upperLeftTile);
+			TilePosition lowerRightTile = new TilePosition (baseLocation.getX()/32 + 2, baseLocation.getY()/32 + 2);
+			if (baseLocation.isStartLocation()) {
+				game.drawBoxMap(upperLeftTile.toPosition(), lowerRightTile.toPosition(), Color.Green);
+			}
+			else {
+				game.drawBoxMap(upperLeftTile.toPosition(), lowerRightTile.toPosition(), Color.Orange);
+			}
+		}
+		//**CREATING BUILDINGS** ===============================================================================
+		//**NEXUS**
+		if (true) {
+			createNexus();
+		}
+		
+		//**UNIT BEHAVIOUR** ===============================================================================
+		//**PROBE BEHAVIOUR**
+		for (Unit myUnit : self.getUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()) {
+				//** WHEN PROBE IDLE **
+				if (myUnit.isIdle() && noCommandForAWhile(myUnit)) {
+					for (Unit safeMineral : returnSafeMineral()) {
+						myUnit.gather(safeMineral);
+					}
+				}
+			}
+		}
+		
+		//**PRODUCTION BUILDING BEHAVIOUR ===============================================================================
+		for (Unit myUnit : self.getUnits()) {
+			if (myUnit.isCompleted() && noCommandForAWhile(myUnit) && !myUnit.isTraining()) {
+				//**NEXUS**
+				if (myUnit.getType() == UnitType.Protoss_Nexus) {
+					if (enoughMoney(UnitType.Protoss_Probe) && self.allUnitCount(UnitType.Protoss_Probe) < 63) {
+						myUnit.build(UnitType.Protoss_Probe);
+					}
+				}
+			}
+		}
+	    
+	}	//onFrame()
+}
