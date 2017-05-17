@@ -1,1 +1,499 @@
+package pinfelBot;
+import java.util.*;
+import bwapi.*;
+import bwta.BWTA;
+import bwta.BaseLocation;
 
+public class TestBot1 extends DefaultBWListener {
+	public static void main(String[] args) {
+		new TestBot1().run();
+	}
+	
+	private Mirror mirror = new Mirror();
+	private Game game;
+	private Player self;
+	public void run() {
+		mirror.getModule().setEventListener(this);
+		mirror.startGame();
+	}	
+	//enough money boolean
+	public Boolean enoughMoney(UnitType unitType) {
+		if (self.minerals() >= unitType.mineralPrice() && self.gas() >= unitType.gasPrice()) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	//no command for a while
+	public Boolean noCommandForAWhile(Unit unit) {
+		if (game.getFrameCount() - unit.getLastCommandFrame() > 3) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//contain all minerals that are within range of an ally nexus
+	Set<Unit> baseMinerals = new HashSet<Unit>();	
+	
+	//pylon, expansion, base, scouting probe
+	Boolean baseBuilderFound = false;
+	Unit baseBuilder = null;
+	Boolean expansionBuilderFound = false;
+	Unit expansionBuilder = null;
+	Boolean pylonBuilderFound = false;
+	Unit pylonBuilder = null;
+	Boolean scoutingProbeFound = false;
+	Unit scoutingProbe = null;
+	
+	//enemy base finder
+	Boolean enemyBaseFound = false;
+	Position enemyBasePosition = null;
+	
+	//enemy building memory
+	Set<Position> enemyBuildingSet = new HashSet<Position>();
+	
+	//pylon build
+	TilePosition pylonTile = null;
+	
+	//expansion list
+	Boolean createExpandList = false;
+	Set<TilePosition> expandTileSet = new HashSet<TilePosition>();
+	
+	//attack
+	Boolean attacking = false;
+	
+	@Override
+	public void onStart() {
+		game = mirror.getGame();
+		self = game.self();
+		game.setLocalSpeed(15);
+		game.setLatCom(false);
+		game.enableFlag(1);
+		
+		BWTA.readMap();
+		BWTA.analyze();		
+		
+	}
+	//return true if there is at least 1 pylon building
+		public Boolean pylonInProgress() {
+			if (self.allUnitCount(UnitType.Protoss_Pylon) > self.completedUnitCount(UnitType.Protoss_Pylon)) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+	
+	//return true if conditions to build a pylon are satisfied
+		public Boolean pylonRequired() {
+			if (self.supplyTotal()/2 >= 0 && self.supplyTotal()/2 <= 9 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 1 && !pylonInProgress()) {
+				return true;
+			}
+			else if (self.supplyTotal()/2 > 9 && self.supplyTotal()/2 <= 17 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 2 && !pylonInProgress()) {
+				return true;
+			}
+			else if (self.supplyTotal()/2 > 17 && self.supplyTotal()/2 <= 25 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 4 && !pylonInProgress()) {
+				return true;
+			}
+			else if (self.supplyTotal()/2 > 25 && (9 + self.allUnitCount(UnitType.Protoss_Pylon)*8 + (self.completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - 
+	        		(self.supplyUsed()/2 + self.allUnitCount(UnitType.Protoss_Nexus) + self.allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) 
+					&& self.supplyTotal()/2 != 200) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+	
+	//find suitable build tile according to building type - taken from example bot
+	public TilePosition getBuildTile(Unit builder, UnitType buildingType, TilePosition aroundTile) {
+		TilePosition ret = null;
+		int maxDist = 3;
+		int stopDist = 40;
+
+		// Refinery, Assimilator, Extractor
+		if (buildingType.isRefinery()) {
+			for (Unit n : game.neutral().getUnits()) {
+				if ((n.getType() == UnitType.Resource_Vespene_Geyser) &&
+						( Math.abs(n.getTilePosition().getX() - aroundTile.getX()) < stopDist ) &&
+						( Math.abs(n.getTilePosition().getY() - aroundTile.getY()) < stopDist )
+						) return n.getTilePosition();
+			}
+		}
+
+		while ((maxDist < stopDist) && (ret == null)) {
+			for (int i=aroundTile.getX()-maxDist; i<=aroundTile.getX()+maxDist; i++) {
+				for (int j=aroundTile.getY()-maxDist; j<=aroundTile.getY()+maxDist; j++) {
+					if (game.canBuildHere(new TilePosition(i,j), buildingType, builder, false)) {
+						// units that are blocking the tile
+						boolean unitsInWay = false;
+						for (Unit u : game.getAllUnits()) {
+							if (u.getID() == builder.getID()) continue;
+							if ((Math.abs(u.getTilePosition().getX()-i) < 4) && (Math.abs(u.getTilePosition().getY()-j) < 4)) unitsInWay = true;
+						}
+						if (!unitsInWay) {
+							return new TilePosition(i, j);
+						}		
+					}
+				}
+			}
+			maxDist += 2;
+		}
+
+		if (ret == null) game.printf("Unable to find suitable build position for "+buildingType.toString());
+		return ret;
+	}
+	
+	@Override
+	public void onFrame() {
+		
+		if (!createExpandList) {
+			for (BaseLocation baseLocations : BWTA.getBaseLocations()) {
+				TilePosition expandTile = new TilePosition (baseLocations.getX()/32, baseLocations.getY()/32);
+				expandTileSet.add(expandTile);
+			}
+			createExpandList = true;
+		}		
+		
+		
+		game.drawTextScreen(10, 10, "Frame count: " + game.getFrameCount());
+		game.drawTextScreen(10, 30, "Base builder found: " + baseBuilderFound );
+		game.drawTextScreen(10, 40, "Pylon builder found: " + pylonBuilderFound );
+		game.drawTextScreen(10, 50, "Worker count: " + self.allUnitCount(UnitType.Protoss_Probe));		
+		
+		//am I attacking?
+		if (self.completedUnitCount(UnitType.Protoss_Zealot) >= 10) {
+			attacking = true;
+		}
+		if (self.completedUnitCount(UnitType.Protoss_Zealot) < 5) {
+			attacking = false;
+		}
+		
+		//re-assign key units if they are dead
+		if (baseBuilderFound == true) {
+			game.drawTextMap(baseBuilder.getPosition(), "Base builder");
+			if (!baseBuilder.exists()) {
+				baseBuilderFound = false;
+				baseBuilder = null;
+			}
+		}
+		if (expansionBuilderFound == true) {
+			game.drawTextMap(expansionBuilder.getPosition(), "Expansion builder");
+			if (!expansionBuilder.exists()) {
+				expansionBuilderFound = false;
+				expansionBuilder = null;
+			}
+		}
+		if (pylonBuilderFound == true) {
+			game.drawTextMap(pylonBuilder.getPosition(), "Pylon builder");
+			if (!pylonBuilder.exists()) {
+				pylonBuilderFound = false;
+				pylonBuilder = null;
+			}
+		}
+		if (scoutingProbeFound == true) {
+			game.drawTextMap(scoutingProbe.getPosition(), "Scouting probe");
+			if (!scoutingProbe.exists()) {
+				scoutingProbeFound = false;
+				scoutingProbe = null;
+			}
+		}
+		
+		//scouting probe behavior
+		if (scoutingProbeFound) {
+			if (self.allUnitCount(UnitType.Protoss_Pylon) >= 1) {
+				if (!enemyBaseFound) {
+					for (BaseLocation startLocations : BWTA.getStartLocations()) {
+						TilePosition startLocationTile = new TilePosition (startLocations.getX()/32, startLocations.getY()/32);
+						if (!game.isExplored(startLocationTile)) {
+							scoutingProbe.move(startLocationTile.toPosition());
+						}
+					}
+				}
+				if (enemyBaseFound) {
+					game.drawTextMap(enemyBasePosition, "Enemy base position");
+				}
+			}
+		}
+		if (!enemyBaseFound) {
+			for (Unit enemyUnits : game.enemy().getUnits()) {
+				if (enemyUnits.isVisible() && enemyUnits.getType() == UnitType.Protoss_Nexus ||enemyUnits.getType() == UnitType.Terran_Command_Center
+						|| enemyUnits.getType() == UnitType.Zerg_Hatchery) {
+					for (TilePosition startTiles : game.getStartLocations()) {
+						if (enemyUnits.getDistance(startTiles.toPosition()) < 300) {
+							enemyBasePosition = enemyUnits.getPosition();
+							enemyBaseFound = true;
+						}
+					}
+				}
+			}
+		}
+		
+		//onFrame:: pylon builder 
+    	game.drawTextScreen(10, 20, "Pylon required: " + pylonRequired());
+    	
+    	if (pylonRequired()) {
+    		if (pylonTile == null) {
+    			pylonTile = getBuildTile(pylonBuilder, UnitType.Protoss_Pylon, self.getStartLocation());
+    		}
+    		if (pylonTile != null) {
+    			TilePosition topRight = new TilePosition (pylonTile.getX() + 1, pylonTile.getY());
+    			TilePosition bottomLeft = new TilePosition (pylonTile.getX(), pylonTile.getY() + 1);
+    			TilePosition bottomRight = new TilePosition (pylonTile.getX() + 1, pylonTile.getY() + 1);
+    			if (!game.isBuildable(pylonTile, true) || !game.isBuildable(topRight, true) || !game.isBuildable(bottomLeft, true)
+    					|| !game.isBuildable(bottomRight, true)) {
+    				pylonTile = null;
+    			}   			
+    		}
+    		if (pylonTile != null) {
+    			if (!enoughMoney(UnitType.Protoss_Pylon)) {
+    				pylonBuilder.move(pylonTile.toPosition());
+    			}
+    			else {
+        			pylonBuilder.build(UnitType.Protoss_Pylon, pylonTile);
+    			}
+    		}
+    	}
+        
+        //onFrame:: gas builder (incomplete: need to change self.getStartLocation() to n'th closest base)
+        if (self.allUnitCount(UnitType.Protoss_Assimilator) < 1  // < self.completedUnitCount(UnitType.Protoss_Nexus) to 1
+        		&& self.allUnitCount(UnitType.Protoss_Probe) >= 12) {
+        	TilePosition gasTile = getBuildTile(baseBuilder, UnitType.Protoss_Assimilator, self.getStartLocation());
+        	if (gasTile != null && self.minerals() >= 75) {
+        		baseBuilder.build(UnitType.Protoss_Assimilator, gasTile);
+        	}
+        }
+        
+        //onFrame:: first gateway
+        if (self.minerals() >= 150 && self.allUnitCount(UnitType.Protoss_Gateway) == 0 && self.completedUnitCount(UnitType.Protoss_Pylon) >= 1) {
+        	TilePosition firstGatewayTile = getBuildTile(baseBuilder, UnitType.Protoss_Gateway, self.getStartLocation());
+        	if (firstGatewayTile != null) {
+        		baseBuilder.build(UnitType.Protoss_Gateway, firstGatewayTile);
+        	}
+        }
+        
+        //onFrame:: cybernetics core
+        if (self.minerals() >= 200 && self.allUnitCount(UnitType.Protoss_Cybernetics_Core) == 0 && self.completedUnitCount(UnitType.Protoss_Gateway) >= 1) {
+        	TilePosition cyberneticsTile = getBuildTile(baseBuilder, UnitType.Protoss_Cybernetics_Core, self.getStartLocation());
+        	if (cyberneticsTile != null) {
+        		baseBuilder.build(UnitType.Protoss_Cybernetics_Core, cyberneticsTile);
+        	}
+        }
+        
+        //onFrame:: gateways after core
+        if ((self.minerals() >=180 && self.allUnitCount(UnitType.Protoss_Nexus)*3 > self.allUnitCount(UnitType.Protoss_Gateway)
+        		&& self.allUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1) || (self.minerals() >=600 
+        		&& self.allUnitCount(UnitType.Protoss_Nexus)*3 > self.allUnitCount(UnitType.Protoss_Gateway))) {
+        	TilePosition otherGatewayTile = getBuildTile(baseBuilder, UnitType.Protoss_Gateway, self.getStartLocation());
+        	if (otherGatewayTile != null) {
+        		baseBuilder.build(UnitType.Protoss_Gateway, otherGatewayTile);
+        	}
+        }
+        
+        //onFrame:: nexus builder (doesnt work, think needs to explore actual base location or expandTileSet.add is not working as intended)
+        if ((self.allUnitCount(UnitType.Protoss_Nexus)*21 <= self.allUnitCount(UnitType.Protoss_Probe)
+        		&& (self.allUnitCount(UnitType.Protoss_Zealot) + self.allUnitCount(UnitType.Protoss_Dragoon))*2 >= self.allUnitCount(UnitType.Protoss_Probe))
+        		|| self.minerals() >= 1250) {        
+        	TilePosition closestBaseTile = null;  
+        	
+        	for (TilePosition possibleExpandTile : expandTileSet) {
+        		if (game.isVisible(possibleExpandTile) && !game.isBuildable(possibleExpandTile, true)) {
+        			expandTileSet.remove(possibleExpandTile);
+        			continue;
+        		}
+
+        		if (closestBaseTile == null || self.getStartLocation().getDistance(possibleExpandTile) < self.getStartLocation().getDistance(closestBaseTile)) {
+        			closestBaseTile = possibleExpandTile;
+        		}
+        	}
+        	game.drawCircleMap(closestBaseTile.toPosition(), 3, Color.Red);
+        	       	
+        	if (closestBaseTile != null && self.minerals() < 400) {
+        		expansionBuilder.move(closestBaseTile.toPosition());
+        	}        	
+        	if (closestBaseTile != null && self.minerals() >= 400 && game.isExplored(closestBaseTile)) {
+        		TilePosition expandTileAdjusted = new TilePosition ((closestBaseTile.getX() - 2), (closestBaseTile.getY() -1 ));
+        		expansionBuilder.build(UnitType.Protoss_Nexus, expandTileAdjusted); 
+        		game.drawCircleMap(expandTileAdjusted.toPosition(), 5, Color.Green);
+        	}
+        }
+		//onFrame:: for my units:
+		for (Unit myUnit : self.getUnits()) {	
+			
+			//dragoon behavior
+			if (myUnit.getType() == UnitType.Protoss_Dragoon) {
+				game.drawCircleMap(myUnit.getPosition(), 150, Color.Red);
+				if (enemyBaseFound) {
+					if (game.getFrameCount()%50 == 0 && myUnit.getDistance(enemyBasePosition) > 500) {
+						myUnit.attack(enemyBasePosition);
+					}
+					if (game.getFrameCount()%50 == 0 && myUnit.getDistance(enemyBasePosition) <= 500) {
+						Unit closestEnemy = null;
+						for (Unit enemyUnit : game.enemy().getUnits()) {
+							if (closestEnemy == null || enemyUnit.getDistance(myUnit) < closestEnemy.getDistance(myUnit)) {
+								closestEnemy = enemyUnit;
+							}
+						}
+						TilePosition enemyTile = new TilePosition (closestEnemy.getX()/32, closestEnemy.getY()/32);
+						myUnit.attack(enemyTile.toPosition());
+					}
+					if ((game.getFrameCount()+35)%50 == 0) {
+						for (Unit enemyUnit : game.enemy().getUnits()) {
+							if (myUnit.getUnitsInRadius(150).contains(enemyUnit)) {
+								myUnit.move(self.getStartLocation().toPosition());
+							}						
+						}
+					}
+				}
+			}
+			//zealot behaviour
+			if (myUnit.getType() == UnitType.Protoss_Zealot) {
+				for (Unit selfUnit : self.getUnits()) {
+					if (selfUnit.getType().isBuilding() && selfUnit.isUnderAttack()) {
+						if (myUnit.isIdle() && noCommandForAWhile(myUnit)) {
+							myUnit.attack(selfUnit.getPosition());
+						}
+					}
+				}
+				if (enemyBaseFound) {
+					if (self.completedUnitCount(UnitType.Protoss_Zealot) >= 4 * (self.allUnitCount(UnitType.Protoss_Nexus)) 
+							&& myUnit.isIdle() && noCommandForAWhile(myUnit)) {
+						myUnit.attack(enemyBasePosition);
+					}
+				}
+			}
+			
+			//nexus
+	        if (myUnit.getType() == UnitType.Protoss_Nexus) {
+	        	//add minerals nearby nexus into a list of 'safe' minerals
+	            for (Unit neutralUnit : game.getNeutralUnits()) {
+	                if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
+	                    if (myUnit.getDistance(neutralUnit.getPosition()) < 300) {
+	                        baseMinerals.add(neutralUnit);
+	                    }
+	                }
+	            }
+	            //train workers
+	            if (self.minerals() >= 50 && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && !myUnit.isTraining()
+	            		&& self.allUnitCount(UnitType.Protoss_Nexus)*21 > self.allUnitCount(UnitType.Protoss_Probe) 
+	            		&& self.allUnitCount(UnitType.Protoss_Probe) < 63) {
+	            	myUnit.build(UnitType.Protoss_Probe);
+	            }
+	        }
+	        
+	        //probe
+	        if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()) {	        	
+	        	
+	        	//declaring a base builder
+	        	if (baseBuilderFound == false && myUnit != expansionBuilder && myUnit != pylonBuilder && myUnit != scoutingProbe) {
+	        		baseBuilder = myUnit;
+	        		baseBuilderFound = true;
+	        	}
+	        	//declaring nexus builder
+	        	if (expansionBuilderFound == false && myUnit != baseBuilder && myUnit != expansionBuilder && myUnit != scoutingProbe) {
+	        		expansionBuilder = myUnit;
+	        		expansionBuilderFound = true;
+	        	}
+	        	//declare pylon builder
+	        	if (pylonBuilderFound == false && myUnit != baseBuilder && myUnit != expansionBuilder && myUnit != scoutingProbe) {
+	        		pylonBuilder = myUnit;
+	        		pylonBuilderFound = true;
+	        	}
+	        	//declaring scouting probe
+	        	if (scoutingProbeFound == false && myUnit != baseBuilder && myUnit != expansionBuilder && myUnit != pylonBuilder) {
+	        		scoutingProbe = myUnit;
+	        		scoutingProbeFound = true;
+	        	}
+	        	// when worker is idle:
+	            if (myUnit != baseBuilder && myUnit != pylonBuilder && myUnit.isIdle() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3
+	            		|| (myUnit == pylonBuilder && myUnit.isIdle() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && self.supplyUsed()/2 < 60)
+	            		|| (myUnit == baseBuilder && myUnit.isIdle() && game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && self.supplyUsed()/2 < 60)) {
+	            	Unit closestMineral = null;
+	            	for (Unit minerals : baseMinerals) {
+	            		if (closestMineral == null || minerals.getDistance(myUnit.getPosition()) < closestMineral.getDistance(myUnit.getPosition())) {
+	            			closestMineral = minerals;
+	            		}
+	            	}
+	            	if (myUnit.isCarryingGas() || myUnit.isCarryingMinerals()) {
+	            		myUnit.returnCargo();
+	            		myUnit.gather(closestMineral, true);
+	            		baseMinerals.remove(closestMineral);
+	            	}
+	            	else {
+	            		myUnit.gather(closestMineral);
+	            		baseMinerals.remove(closestMineral);
+	            	}
+	            }	          	            	            
+	        }
+	        
+	        //gateway : stop training when want to expand, but can train if floating excess amount of minerals
+	        if (myUnit.getType() == UnitType.Protoss_Gateway) {
+	        	
+	        	if (game.getFrameCount() - myUnit.getLastCommandFrame() > 3 && !myUnit.isTraining()) {
+	        		//#1
+	        		if ((self.minerals() >= 125 && self.allUnitCount(UnitType.Protoss_Nexus)*21 > self.allUnitCount(UnitType.Protoss_Probe)
+	        				&& self.allUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1 && self.allUnitCount(UnitType.Protoss_Pylon) >= 2)
+	        				//#2
+	        				|| (self.minerals() >= 500) 
+	        				//#3
+	        				|| (self.allUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1 && self.allUnitCount(UnitType.Protoss_Pylon) >= 2 &&
+	        				(self.allUnitCount(UnitType.Protoss_Zealot) + self.allUnitCount(UnitType.Protoss_Dragoon))*2 < self.allUnitCount(UnitType.Protoss_Probe))) {
+	        			
+	        			if (self.gas() > 50 && self.completedUnitCount(UnitType.Protoss_Cybernetics_Core) >= 1 
+		        				&& self.allUnitCount(UnitType.Protoss_Dragoon) <= self.allUnitCount(UnitType.Protoss_Zealot)
+		        				|| (self.gas() >= 50 && game.getFrameCount() < 6000)) {
+		        			myUnit.build(UnitType.Protoss_Dragoon);
+		        		}
+		        		else {
+		        			myUnit.build(UnitType.Protoss_Zealot);
+		        		}
+	        		}	        		
+	        	}
+	        }
+	        
+	        //cybernetics core (research singularity charge)
+	        if (myUnit.getType() == UnitType.Protoss_Cybernetics_Core) {
+	        	if (self.minerals() >= 200 && self.gas() >= 200 && myUnit.canUpgrade(UpgradeType.Singularity_Charge)) {
+	        		myUnit.upgrade(UpgradeType.Singularity_Charge);
+	        	}
+	        }
+	        
+	        //send probes to gas (currently somewhat buggy)
+	        if (myUnit.getType() == UnitType.Protoss_Assimilator && myUnit.isCompleted()) {
+	            int guysInGas = 0;       		
+        		for (Unit nearbyProbes : myUnit.getUnitsInRadius(175)) {
+        			if (nearbyProbes.getType() == UnitType.Protoss_Probe && nearbyProbes.isGatheringGas()) {
+        				++guysInGas;
+        			}
+        			if (guysInGas >= 3) {
+            			break;
+            		}
+        		}   
+        		if (guysInGas < 3) {
+        			int numGuysToSend = 3 - guysInGas;
+        			Set<Unit> guysToSend = new HashSet<Unit>();
+        			for (Unit workers : self.getUnits()) {
+        				if (workers.getType() == UnitType.Protoss_Probe && workers.isCompleted() && guysToSend.size() < numGuysToSend
+        						&& workers != baseBuilder && workers != expansionBuilder && workers != pylonBuilder && workers != scoutingProbe) {
+        					guysToSend.add(workers);
+        				}
+        				if (guysToSend.size() == numGuysToSend) {
+        					for (Unit sendingGuys : guysToSend) {
+        						if (!sendingGuys.isGatheringGas()) {
+        							sendingGuys.gather(myUnit);
+        						}        						
+        						if (!sendingGuys.exists()) {
+        							guysToSend.remove(sendingGuys);
+        						}
+        						continue;
+        					}
+        				}
+        			}
+        		}
+        	}	           
+	    }
+	}	//onFrame()
+}
