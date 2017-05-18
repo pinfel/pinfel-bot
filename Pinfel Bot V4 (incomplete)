@@ -98,13 +98,16 @@ public class TestBot1 extends DefaultBWListener {
 		if (self.supplyTotal()/2 >= 200) {
 			return false;
 		}
-		else if (self.supplyTotal()/2 <= 9 && self.supplyTotal()/2 - self.supplyUsed() <= 1 && !pylonInProgress()) {
+		else if (self.supplyTotal()/2 >= 0 && self.supplyTotal()/2 <= 9 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 1 
+			&& !pylonInProgress()) {
 			return true;
 		}
-		else if (self.supplyTotal()/2 <= 17 && self.supplyTotal()/2 - self.supplyUsed() <= 2 && !pylonInProgress()) {
+		else if (self.supplyTotal()/2 > 9 && self.supplyTotal()/2 <= 17 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 2 
+			&& !pylonInProgress()) {
 			return true;
 		}
-		else if (self.supplyTotal()/2 <= 25 && self.supplyTotal()/2 - self.supplyUsed() <= 4 && !pylonInProgress()) {
+		else if (self.supplyTotal()/2 > 17 && self.supplyTotal()/2 <= 25 && self.supplyTotal()/2 - self.supplyUsed()/2 <= 4 
+			&& !pylonInProgress()) {
 			return true;
 		}
 		else if (self.supplyTotal()/2 > 25 && (9 + self.allUnitCount(UnitType.Protoss_Pylon)*8 + (self.completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - 
