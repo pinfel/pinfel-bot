@@ -1,0 +1,132 @@
+package buildingsPinfel;
+import bwapi.*;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.*;
+
+
+
+public class BuildingGateway {
+	
+	public static Boolean buildGatewayCondition() {
+		Boolean preExistingGateCondition = (Pinfel.game.self().completedUnitCount(UnitType.Protoss_Pylon) >= 1);
+		//VS TERRAN
+		if (Pinfel.game.enemy().getRace() == Race.Terran){
+			if (preExistingGateCondition) {
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) >= 10 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) < 1) {
+					return true;
+				}
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Robotics_Facility) >= 1 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) < 3) {
+					return true;
+				}
+			}
+		}
+		
+		//VS PROTOSS
+		if (Pinfel.game.enemy().getRace() == Race.Protoss){
+			if (preExistingGateCondition) {
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) >= 10 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) < 1) {
+					return true;
+				}
+			}
+		}
+		
+		//VS ZERG
+		if (Pinfel.game.enemy().getRace() == Race.Protoss){
+			if (preExistingGateCondition) {
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) >= 10 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) < 1) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	public static int totalZealotsMade = 0;
+	public static int totalDragoonsMade = 0;
+	
+	public static void buildZealotCondition() {
+		for (Unit myGateway : UnitHolder.myGateways()) {
+			if (!myGateway.isTraining() && PinfelUtil.noCommandForAWhile(myGateway)) {
+				//VS TERRAN
+				if (Pinfel.game.enemy().getRace() == Race.Terran) {
+					//condition to train zealot
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Zealot) && totalZealotsMade < 3) {
+						myGateway.build(UnitType.Protoss_Zealot);
+					}
+					if (ArmyManager.dragoonPressureEnd == true && 
+							Pinfel.game.self().allUnitCount(UnitType.Protoss_Zealot) <= Pinfel.game.self().allUnitCount(UnitType.Protoss_Dragoon)) {
+						myGateway.build(UnitType.Protoss_Zealot);
+					}
+				}
+				
+				//VS PROTOSS
+				if (Pinfel.game.enemy().getRace() == Race.Protoss) {
+					//condition to train zealot
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Zealot) && totalZealotsMade < 3) {
+						myGateway.build(UnitType.Protoss_Zealot);
+					}
+				}
+				
+				//VS ZERG
+				if (Pinfel.game.enemy().getRace() == Race.Zerg) {
+					//condition to train zealot
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Zealot) && totalZealotsMade < 3) {
+						myGateway.build(UnitType.Protoss_Zealot);
+					}
+				}
+			}
+		}
+	}
+	
+	public static void buildDragoonCondition() {
+		for (Unit myGateway : UnitHolder.myGateways()) {
+			if (!myGateway.isTraining() && PinfelUtil.noCommandForAWhile(myGateway)) {
+				//VS TERRAN
+				if (Pinfel.game.enemy().getRace() == Race.Terran) {
+					//condition to train dragoon
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Dragoon) && totalDragoonsMade < 5 || ArmyManager.dragoonPressureEnd() == false) {
+						myGateway.build(UnitType.Protoss_Dragoon);
+					}
+					if (ArmyManager.dragoonPressureEnd == true && 
+							Pinfel.game.self().allUnitCount(UnitType.Protoss_Zealot) > Pinfel.game.self().allUnitCount(UnitType.Protoss_Dragoon)) {
+						myGateway.build(UnitType.Protoss_Dragoon);
+					}
+				}
+				
+				//VS PROTOSS
+				if (Pinfel.game.enemy().getRace() == Race.Protoss) {
+					//condition to train dragoon
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Dragoon) && totalDragoonsMade < 5) {
+						myGateway.build(UnitType.Protoss_Dragoon);
+					}
+				}
+				
+				//VS ZERG
+				if (Pinfel.game.enemy().getRace() == Race.Zerg) {
+					//condition to train dragoon
+					if (PinfelUtil.enoughMoney(UnitType.Protoss_Dragoon) && totalDragoonsMade < 5) {
+						myGateway.build(UnitType.Protoss_Dragoon);
+					}
+				}
+			}
+		}
+	}
+			
+	public static void buildingGatewayUpdate() {
+		Boolean buildGatewayCondition = buildGatewayCondition();
+		
+		Pinfel.game.drawTextScreen(10, 40, "Gateway required: " + buildGatewayCondition);	
+		
+		Pinfel.game.drawTextScreen(150, 20, "Zealots: " + totalZealotsMade + "-" + Pinfel.game.self().completedUnitCount(UnitType.Protoss_Zealot) + "-"
+				+ (Pinfel.game.self().allUnitCount(UnitType.Protoss_Zealot) - Pinfel.game.self().completedUnitCount(UnitType.Protoss_Zealot)));
+		
+		Pinfel.game.drawTextScreen(150, 30, "Dragoons: " + totalDragoonsMade + "-" + Pinfel.game.self().completedUnitCount(UnitType.Protoss_Dragoon) + "-"
+				+ (Pinfel.game.self().allUnitCount(UnitType.Protoss_Dragoon) - Pinfel.game.self().completedUnitCount(UnitType.Protoss_Dragoon)));
+		
+		PinfelUtil.buildingBuilder(UnitType.Protoss_Gateway, buildGatewayCondition && !BuildingPylon.pylonRequired());
+		
+		buildZealotCondition();
+		
+		buildDragoonCondition();
+	}
+	
+}
