@@ -1,0 +1,78 @@
+package buildingsPinfel;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.*;
+import bwapi.*;
+
+
+public class BuildingPylon {
+	//return true if there is at least 1 pylon building
+	public static Boolean pylonInProgress() {
+		if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Pylon) > Pinfel.game.self().completedUnitCount(UnitType.Protoss_Pylon)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	//return true if conditions to build a pylon are satisfied
+	public static Boolean pylonRequired() {
+		//VS TERRAN
+		if (Pinfel.game.enemy().getRace() == Race.Terran){
+			if (Pinfel.game.self().supplyTotal()/2 >= 0 && Pinfel.game.self().supplyTotal()/2 <= 9 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {
+				return true;				}
+			else if (Pinfel.game.self().supplyTotal()/2 > 9 && Pinfel.game.self().supplyTotal()/2 <= 17 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 5 && !pylonInProgress()) {
+				return true;
+			}
+			else if (Pinfel.game.self().supplyTotal()/2 > 17 && Pinfel.game.self().supplyTotal()/2 <= 25 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {					
+				return true;
+			}
+		}
+		
+		//VS PROTOSS
+		if (Pinfel.game.enemy().getRace() == Race.Protoss){
+			if (Pinfel.game.self().supplyTotal()/2 >= 0 && Pinfel.game.self().supplyTotal()/2 <= 9 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {
+				return true;				}
+			else if (Pinfel.game.self().supplyTotal()/2 > 9 && Pinfel.game.self().supplyTotal()/2 <= 17 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 5 && !pylonInProgress()) {
+				return true;
+			}
+			else if (Pinfel.game.self().supplyTotal()/2 > 17 && Pinfel.game.self().supplyTotal()/2 <= 25 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {					
+				return true;
+			}
+		}
+		
+		//VS ZERG
+		if (Pinfel.game.enemy().getRace() == Race.Zerg){
+			if (Pinfel.game.self().supplyTotal()/2 >= 0 && Pinfel.game.self().supplyTotal()/2 <= 9 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {
+				return true;				}
+			else if (Pinfel.game.self().supplyTotal()/2 > 9 && Pinfel.game.self().supplyTotal()/2 <= 17 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 5 && !pylonInProgress()) {
+				return true;
+			}
+			else if (Pinfel.game.self().supplyTotal()/2 > 17 && Pinfel.game.self().supplyTotal()/2 <= 25 && Pinfel.game.self().supplyTotal()/2 
+					- Pinfel.game.self().supplyUsed()/2 <= 1 && !pylonInProgress()) {					
+				return true;
+			}
+		}
+		
+		//Default pylon builder past 3rd pylon onwards
+		else if (Pinfel.game.self().supplyTotal()/2 > 25 && (9 + Pinfel.game.self().allUnitCount(UnitType.Protoss_Pylon)*8 + 
+				(Pinfel.game.self().completedUnitCount(UnitType.Protoss_Nexus) - 1)*9 - (Pinfel.game.self().supplyUsed()/2 + 
+					Pinfel.game.self().allUnitCount(UnitType.Protoss_Nexus) + Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway)*3) <= 0) 
+				&& Pinfel.game.self().supplyTotal()/2 != 200) {					
+			return true;
+		}
+		return false;
+	}
+	
+	//on frame
+	public static void buildingPylonUpdate() {
+		PinfelUtil.buildingBuilder(UnitType.Protoss_Pylon, pylonRequired() && !BuildingNexus.conditionToBuildNexus());
+	}
+}
