@@ -1,0 +1,36 @@
+package utilitiesPinfel;
+import buildingsPinfel.BuildingGateway;
+import bwapi.*;
+import pinfelBot.Pinfel;
+
+public class ArmyManager {
+	public static Boolean zealotPressureEnd = false;
+	public static Boolean initialZealotPressureEnd() {
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			for (Unit enemyUnits : Pinfel.game.enemy().getUnits()) {
+				if (enemyUnits.getType() == UnitType.Terran_Vulture || enemyUnits.getType() == UnitType.Terran_Bunker && enemyUnits.isCompleted()
+						|| enemyUnits.getType() == UnitType.Terran_Siege_Tank_Tank_Mode || enemyUnits.getType() == UnitType.Terran_Siege_Tank_Siege_Mode) {
+					zealotPressureEnd = true;
+				}
+			}		
+		}
+		return zealotPressureEnd;
+	}
+	
+	public static Boolean dragoonPressureEnd = false;
+	public static Boolean dragoonPressureEnd() {
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			for (Unit enemyUnits : Pinfel.game.enemy().getUnits()) {
+				if (enemyUnits.getType() == UnitType.Terran_Siege_Tank_Tank_Mode || enemyUnits.getType() == UnitType.Terran_Siege_Tank_Siege_Mode ||
+						BuildingGateway.totalDragoonsMade >= 15) {
+					dragoonPressureEnd = true;
+				}
+			}		
+		}
+		return dragoonPressureEnd;
+	}
+	
+	public static void armyManagerUpdate() {
+
+	}
+}
