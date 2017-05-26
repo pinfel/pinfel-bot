@@ -1,0 +1,167 @@
+package utilitiesPinfel;
+import bwapi.*;
+import buildingsPinfel.*;
+import pinfelBot.Pinfel;
+
+
+public class PinfelUtil {
+	//if no command for a while, return true
+	public static Boolean noCommandForAWhile(Unit unit) {
+		if (Pinfel.game.getFrameCount() - unit.getLastCommandFrame() > 3) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//check if we have enough money for unit type
+	public static Boolean enoughMoney(UnitType unitType) {
+		if (Pinfel.game.self().minerals() >= unitType.mineralPrice() && Pinfel.game.self().gas() >= unitType.gasPrice()) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	//returns a build tile
+	public static TilePosition getBuildTile(UnitType buildingType, TilePosition aroundTile) {
+		if (buildingType == UnitType.Protoss_Nexus) {
+			return BuildingNexus.nextExpandTile();
+		}
+		
+		TilePosition returnTile = null;
+		int maxDist = 5;
+		int stopDist = 40;
+		while ((maxDist < stopDist) && (returnTile == null)) {
+			for (int i = aroundTile.getX() - maxDist; i <= aroundTile.getX() + maxDist; i++) {
+				for (int j = aroundTile.getY() - maxDist; j <= aroundTile.getY() + maxDist; j++) {
+					TilePosition potentialTile = new TilePosition(i, j);
+					if (Pinfel.game.canBuildHere(potentialTile, buildingType)) {
+						//IF PYLON
+						if (buildingType == UnitType.Protoss_Pylon) {
+							Boolean tooCloseToOtherPylons = false;
+							for (Unit allPylons : UnitHolder.myPylonsAll()) {
+								if (allPylons.getDistance(potentialTile.toPosition()) < 175) {
+									tooCloseToOtherPylons = true;
+								}
+							}						
+							if (potentialTile.getDistance(Pinfel.game.self().getStartLocation()) >= 8 && tooCloseToOtherPylons == false) {
+								return potentialTile;
+							}
+						}
+						
+						//IF GATEWAY
+						if (buildingType == UnitType.Protoss_Gateway) {						
+							if (potentialTile.getDistance(Pinfel.game.self().getStartLocation()) >= 8) {
+								return potentialTile;
+							}
+						}
+						
+						//IF ASSIMILATOR
+						if (buildingType == UnitType.Protoss_Assimilator) {						
+							if (true) {
+								return potentialTile;
+							}
+						}
+						
+						//IF CORE
+						if (buildingType == UnitType.Protoss_Cybernetics_Core) {						
+							if (potentialTile.getDistance(Pinfel.game.self().getStartLocation()) >= 8) {
+								return potentialTile;
+							}
+						}
+						
+						//IF ROBOTICS
+						if (buildingType == UnitType.Protoss_Robotics_Facility) {						
+							if (potentialTile.getDistance(Pinfel.game.self().getStartLocation()) >= 8) {
+								return potentialTile;
+							}
+						}
+						
+						//IF FORGE
+						if (buildingType == UnitType.Protoss_Forge) {						
+							if (potentialTile.getDistance(Pinfel.game.self().getStartLocation()) >= 8) {
+								return potentialTile;
+							}
+						}
+					}		
+				}
+			}
+			maxDist += 1;
+		}
+		if (returnTile == null) {
+			Pinfel.game.printf("Unable to find suitable build position for "+buildingType.toString());
+		}
+		return returnTile;
+	}
+	//building builder
+	public static TilePosition buildTile = null;
+	public static Unit builder = null;
+
+	public static void buildingBuilder(UnitType unitType, Boolean buildCondition) {
+		if (buildCondition) {
+			//check if we have an existing tile to build, otherwise get the tile
+			if (buildTile == null) {
+				buildTile = PinfelUtil.getBuildTile(unitType, Pinfel.game.self().getStartLocation());
+			}
+			
+			if (buildTile != null && builder != null) {
+				//check if we can still build on previous build tile
+				if (!Pinfel.game.canBuildHere(buildTile, unitType, builder, false)) {
+					Pinfel.game.printf("Reset build tile");
+					buildTile = null;
+					builder = null;
+				}
+				//getting probe to build
+				if (!(PinfelUtil.enoughMoney(unitType) && Pinfel.game.isExplored(buildTile))) {
+					builder.move(buildTile.toPosition());
+				}
+				if (PinfelUtil.enoughMoney(unitType) && Pinfel.game.isExplored(buildTile)) {
+					builder.build(unitType, buildTile);
+				}
+			}
+			
+			//check if we have already assigned a probe to build
+			if (buildTile != null && builder == null) {
+				Unit closestProbeToTile = null;
+				for (Unit myProbes : UnitHolder.myProbes()) {
+					if (myProbes.isGatheringMinerals()) {
+						if (closestProbeToTile == null || myProbes.getDistance(buildTile.toPosition()) < closestProbeToTile.getDistance(buildTile.toPosition())) {
+							closestProbeToTile = myProbes;
+						}
+					}
+				}
+				builder = closestProbeToTile;
+			}
+			
+			//check if assigned probe to build is dead or not
+			if (builder != null) {
+				Pinfel.game.drawCircleMap(builder.getPosition(), 16, Color.Red);
+				if (!builder.exists()) {
+					builder = null;
+				}
+			}
+			//debug, show tile
+			if (buildTile != null) {
+				//2x2
+				if (unitType == UnitType.Protoss_Pylon || unitType == UnitType.Protoss_Robotics_Facility) {
+					Pinfel.game.drawBoxMap(buildTile.toPosition(), new TilePosition(buildTile.getX() + 2, buildTile.getY() + 2).toPosition(), Color.Orange);
+				}
+				//4x3
+				if (unitType == UnitType.Protoss_Gateway || unitType == UnitType.Protoss_Nexus) {
+					Pinfel.game.drawBoxMap(buildTile.toPosition(), new TilePosition(buildTile.getX() + 4, buildTile.getY() + 3).toPosition(), Color.Orange);
+				}
+				//4x2
+				if (unitType == UnitType.Protoss_Assimilator) {
+					Pinfel.game.drawBoxMap(buildTile.toPosition(), new TilePosition(buildTile.getX() + 4, buildTile.getY() + 2).toPosition(), Color.Orange);
+				}
+				//3x2
+				if (unitType == UnitType.Protoss_Cybernetics_Core || unitType == UnitType.Protoss_Forge) {
+					Pinfel.game.drawBoxMap(buildTile.toPosition(), new TilePosition(buildTile.getX() + 3, buildTile.getY() + 2).toPosition(), Color.Orange);
+				}
+			}
+		}
+	}
+}
