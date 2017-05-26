@@ -1,0 +1,53 @@
+package utilitiesPinfel;
+import bwapi.*;
+import pinfelBot.Pinfel;
+import bwta.BWTA;
+import bwta.BaseLocation;
+import java.util.HashSet;
+import java.util.Set;
+
+public class PositionHolder {
+	//hold upper left tile of all expansion positions
+	public static Set<TilePosition> baseLocations() {
+		Set<TilePosition> baseLocationSet = new HashSet<TilePosition>();
+		for (BaseLocation baseLocation : BWTA.getBaseLocations()) {
+			TilePosition baseLocationTile = new TilePosition(baseLocation.getX()/32 - 2, baseLocation.getY()/32 - 1);
+			baseLocationSet.add(baseLocationTile);
+		}
+		return baseLocationSet;
+	}
+	
+	//holds upper left tile of all start positions
+	public static Set<TilePosition> startLocations() {
+		Set<TilePosition> startLocationSet = new HashSet<TilePosition>();
+		for (BaseLocation baseLocation : BWTA.getBaseLocations()) {
+			if (baseLocation.isStartLocation()) {
+				TilePosition baseLocationTile = new TilePosition(baseLocation.getX()/32 - 2, baseLocation.getY()/32 - 1);
+				startLocationSet.add(baseLocationTile);
+			}
+		}
+		return startLocationSet;
+	}
+	
+	//ON FRAME
+	public static void positionHolderUpdate() {
+		//DEBUG: show start bases in yellow, normal bases in orange
+		for (BaseLocation baseLocation : BWTA.getBaseLocations()) {
+			TilePosition baseTileUpperLeft = new TilePosition(baseLocation.getX()/32 - 2, baseLocation.getY()/32 - 1);
+			TilePosition baseTileLowerRight = new TilePosition(baseLocation.getX()/32 + 2, baseLocation.getY()/32 + 2);
+			if (baseLocation.isStartLocation()) {
+				Pinfel.game.drawBoxMap(baseTileUpperLeft.toPosition(), baseTileLowerRight.toPosition(), Color.Yellow);
+			}
+			else {
+				Pinfel.game.drawBoxMap(baseTileUpperLeft.toPosition(), baseTileLowerRight.toPosition(), Color.Orange);
+			}
+		}
+		
+		//DEBUG: show ramp 
+		for (bwta.Chokepoint chokePoints : BWTA.getChokepoints()) {
+			Position chokePointCenter = chokePoints.getCenter();
+			int chokeWidth = (int) Math.round(chokePoints.getWidth());
+			Pinfel.game.drawCircleMap(chokePointCenter, chokeWidth/2, Color.Teal);
+		}
+	}
+}
