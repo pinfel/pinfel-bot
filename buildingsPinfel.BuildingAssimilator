@@ -1,0 +1,79 @@
+package buildingsPinfel;
+
+import java.util.HashSet;
+import java.util.Set;
+import bwapi.*;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.PinfelUtil;
+import utilitiesPinfel.UnitHolder;
+
+public class BuildingAssimilator {
+	
+	public static void getProbesToMineGas() {
+		for (Unit myAssimilators : UnitHolder.myAssimilators()) {
+			Set<Unit> probesInGas = new HashSet<Unit>();
+			
+			for (Unit myProbes : UnitHolder.myProbes()) {
+				if (myProbes.getDistance(myAssimilators.getPosition()) < 200 && myProbes.isGatheringGas()) {
+					probesInGas.add(myProbes);
+				}
+			}
+			
+			if (probesInGas.size() < 3) {
+				Unit closestProbeToGas = null;
+				for (Unit myProbes : UnitHolder.myProbes()) {
+					if (!probesInGas.contains(myProbes) && myProbes.isGatheringMinerals()) {
+						if (closestProbeToGas == null || myAssimilators.getDistance(myProbes) < myAssimilators.getDistance(closestProbeToGas)) {
+							closestProbeToGas = myProbes;
+						}
+					}
+				}
+				closestProbeToGas.gather(myAssimilators);
+			}
+			if (probesInGas.size() > 3) {
+				for (Unit myProbes : probesInGas) {
+					if (PinfelUtil.noCommandForAWhile(myProbes)) {
+						myProbes.stop();
+						break;
+					}
+				}
+			}
+		}
+	}
+	
+	public static Boolean buildConditionAssimilator() {
+		//VS TERRAN
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) >= 14 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Assimilator) == 0) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+			
+		//VS PROTOSS
+		if (Pinfel.game.enemy().getRace() == Race.Protoss) {
+				
+		}
+		else {
+			return false;
+		}
+			
+		//VS ZERG
+		if (Pinfel.game.enemy().getRace() == Race.Zerg) {
+	
+		}
+		else {
+			return false;
+		}
+		
+	return false;
+	}
+	
+	public static void buildingAssimilatorUpdate() {	
+		Pinfel.game.drawTextScreen(10, 50, "Assimilator required: " + buildConditionAssimilator());
+		PinfelUtil.buildingBuilder(UnitType.Protoss_Assimilator, buildConditionAssimilator());
+		getProbesToMineGas();
+	}
+}
