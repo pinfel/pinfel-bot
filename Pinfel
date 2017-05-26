@@ -1,0 +1,85 @@
+package pinfelBot;
+//import java.util.ArrayList;
+import bwapi.*;
+import bwta.BWTA;
+import utilitiesPinfel.*;
+import buildingsPinfel.*;
+import unitsPinfel.*;
+
+public class Pinfel extends DefaultBWListener {
+	public static void main(String[] args) {
+		new Pinfel().run();
+	}
+	
+	private Mirror mirror = new Mirror();
+	public static Game game;
+	private Player self;
+	public void run() {
+		mirror.getModule().setEventListener(this);
+		mirror.startGame();
+	}	
+	
+	// ArrayList<MyUnit> myUnits = new ArrayList<MyUnit>();
+	
+	@Override
+	public void onStart() {
+		game = mirror.getGame();
+		self = game.self();
+		game.setLocalSpeed(15);
+		game.setLatCom(false);
+		game.enableFlag(1);
+		
+		BWTA.readMap();
+		BWTA.analyze();		
+		
+	}
+	
+	
+	@Override
+	public void onFrame() {
+		game.drawTextScreen(10, 10, "Frame count: " + game.getFrameCount());
+		game.drawTextScreen(10, 20, "Enemy race: " + game.enemy().getRace());
+		game.drawTextScreen(10, 30, "Pylon required: " + BuildingPylon.pylonRequired());
+		/*
+		for (MyUnit myUnit : myUnits) {
+			myUnit.drawDebug();
+			myUnit.update();
+		}
+		*/
+		UnitProbe.unitProbeUpdate();
+		UnitZealot.unitZealotUpdate();
+		UnitDragoon.unitDragoonUpdate();
+		BuildingNexus.buildingNexusUpdate();
+		BuildingPylon.buildingPylonUpdate();
+		BuildingAssimilator.buildingAssimilatorUpdate();
+		BuildingGateway.buildingGatewayUpdate();
+		BuildingCyberneticsCore.buildingCyberneticsCoreUpdate();
+		BuildingRoboticsFacility.buildingRoboticsFacilityUpdate();
+		BuildingForge.buildingForgeUpdate();
+		PositionHolder.positionHolderUpdate();
+		ArmyManager.armyManagerUpdate();
+	}
+	
+	@Override
+	public void onUnitCreate(Unit unit) {
+		if (unit.getType() == UnitType.Protoss_Probe) {
+			BuildingNexus.totalProbesMade++;
+		}
+		if (unit.getType() == UnitType.Protoss_Zealot) {
+			BuildingGateway.totalZealotsMade++;
+		}
+		if (unit.getType() == UnitType.Protoss_Dragoon) {
+			BuildingGateway.totalDragoonsMade++;
+		}
+		
+		
+		/*
+		if (unit.getPlayer() == self) {
+			MyUnit myUnit = new MyUnit(unit);
+			myUnits.add(myUnit);
+			game.printf("Hello"); //debug thingy
+		}
+		*/
+	}
+
+}
