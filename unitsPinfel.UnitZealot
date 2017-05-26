@@ -1,0 +1,35 @@
+package unitsPinfel;
+
+import bwapi.*;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.*;
+
+public class UnitZealot {
+	public static void unitZealotUpdate() {
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			for (Unit myZealot : UnitHolder.myZealots()) {
+				
+				//DURING INITIAL ZEALOT PRESSURE
+				if (ArmyManager.initialZealotPressureEnd() == false) {		
+					if (myZealot.isIdle() && UnitProbe.enemyStartTile != null) {
+						myZealot.attack(UnitProbe.enemyStartTile.toPosition());
+					}
+					else if (myZealot.getShields() == 0) {
+						myZealot.move(Pinfel.game.self().getStartLocation().toPosition());
+					}
+					else if (myZealot.getShields() == 20) {
+						myZealot.stop();
+					}
+					else {
+						//nothing
+					}
+				}
+				
+				//DEFAULT BEHAVIOUR
+				else {
+					myZealot.move(Pinfel.game.self().getStartLocation().toPosition());
+				}
+			}			
+		}
+	}
+}
