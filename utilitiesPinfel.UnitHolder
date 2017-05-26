@@ -1,0 +1,151 @@
+package utilitiesPinfel;
+import java.util.HashSet;
+import java.util.Set;
+import bwapi.*;
+import pinfelBot.Pinfel;
+
+public class UnitHolder {
+	public static Set<Unit> returnUnitList(UnitType unitType, Boolean isCompleted) {
+		Set<Unit> unitHolder = new HashSet<Unit>();
+		for (Unit myUnits : Pinfel.game.self().getUnits()) {
+			if (myUnits.getType() == unitType) {
+				if (isCompleted) {
+					if (myUnits.isCompleted()) {
+						unitHolder.add(myUnits);
+					}
+				}
+				if (!isCompleted) {
+					unitHolder.add(myUnits);
+				}
+			}
+		}
+		return unitHolder;
+	}
+	//================================================NEUTRAL UNITS START================================================
+	//return list of all minerals in the game
+	public static Set<Unit> allMinerals() {
+		Set<Unit> allMineralSet = new HashSet<Unit>();
+		for (Unit neutralUnit : Pinfel.game.getNeutralUnits()) {
+			if (neutralUnit.getType() == UnitType.Resource_Mineral_Field) {
+				allMineralSet.add(neutralUnit);
+			}
+		}
+		return allMineralSet;
+	}
+	
+	//return list of minerals that are close to a nexus
+	public static Set<Unit> safeMinerals() {
+		Set<Unit> safeMineralSet = new HashSet<Unit>();
+		for (Unit allMinerals : allMinerals()) {
+			for (Unit myNexus : myNexus()) {
+				if (allMinerals.getDistance(myNexus) < 250) {
+					safeMineralSet.add(allMinerals);
+				}
+			}
+		}
+		return safeMineralSet;
+	}
+	
+	//================================================NEUTRAL UNITS END================================================
+	
+	//================================================SELF UNITS START================================================
+	//return unit list of self units
+	public static Set<Unit> myUnits() {
+		Set<Unit> myUnitSet = new HashSet<Unit>();
+		for (Unit myUnit : Pinfel.game.self().getUnits()) {
+			if (myUnit.isCompleted()) {
+				myUnitSet.add(myUnit);
+			}
+		}
+		return myUnitSet;
+	}
+	
+	//return unit list of self nexus
+	public static Set<Unit> myNexus() {
+		Set<Unit> myNexusSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Nexus && myUnit.isCompleted()) {
+				myNexusSet.add(myUnit);
+			}
+		}
+		return myNexusSet;
+	}
+	
+	//return unit list of self probes
+	public static Set<Unit> myProbes() {
+		Set<Unit> myProbeSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Probe && myUnit.isCompleted()) {
+				myProbeSet.add(myUnit);
+			}
+		}
+		return myProbeSet;
+	}
+	
+	//return unit list of self pylons, includes incomplete
+	public static Set<Unit> myPylonsAll() {
+		Set<Unit> myPylonAllSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Pylon) {
+				myPylonAllSet.add(myUnit);
+			}
+		}
+		return myPylonAllSet;
+	}
+	
+	//return unit list of self gateways
+	public static Set<Unit> myGateways() {
+		Set<Unit> myGatewaySet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Gateway && myUnit.isCompleted()) {
+				myGatewaySet.add(myUnit);
+			}
+		}
+		return myGatewaySet;
+	}
+	
+	//return unit list of self assimilators
+	public static Set<Unit> myAssimilators() {
+		Set<Unit> myAssimilatorSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Assimilator && myUnit.isCompleted()) {
+				myAssimilatorSet.add(myUnit);
+			}
+		}
+		return myAssimilatorSet;
+	}
+	
+	//return unit list of self cybernetics core
+	public static Set<Unit> myCyberneticsCore() {
+		Set<Unit> myCoreSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Cybernetics_Core && myUnit.isCompleted()) {
+				myCoreSet.add(myUnit);
+			}
+		}
+		return myCoreSet;
+	}
+	
+	//return unit list of self zealots
+	public static Set<Unit> myZealots() {
+		Set<Unit> myZealotSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Zealot && myUnit.isCompleted()) {
+				myZealotSet.add(myUnit);
+			}
+		}
+		return myZealotSet;
+	}
+	
+	//return unit list of self dragoons
+	public static Set<Unit> myDragoons() {
+		Set<Unit> myDragoonSet = new HashSet<Unit>();
+		for (Unit myUnit : myUnits()) {
+			if (myUnit.getType() == UnitType.Protoss_Dragoon && myUnit.isCompleted()) {
+				myDragoonSet.add(myUnit);
+			}
+		}
+		return myDragoonSet;
+	}
+	//================================================SELF UNITS END================================================
+}
