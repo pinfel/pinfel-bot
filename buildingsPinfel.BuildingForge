@@ -1,0 +1,50 @@
+package buildingsPinfel;
+
+import bwapi.*;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.PinfelUtil;
+import utilitiesPinfel.UnitHolder;
+
+public class BuildingForge {
+	public static Boolean buildForgeCondition() {
+		Boolean preExistingGateCondition = (Pinfel.game.self().completedUnitCount(UnitType.Protoss_Pylon) >= 1);
+		//VS TERRAN
+		if (Pinfel.game.enemy().getRace() == Race.Terran){
+			if (preExistingGateCondition) {
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) >= 3 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Forge) < 1) {
+					return true;
+				}
+			}
+		}
+		
+		//VS PROTOSS
+		if (Pinfel.game.enemy().getRace() == Race.Protoss){
+			if (preExistingGateCondition) {
+
+			}
+		}
+		
+		//VS ZERG
+		if (Pinfel.game.enemy().getRace() == Race.Protoss){
+			if (preExistingGateCondition) {
+
+			}
+		}
+		return false;
+	}
+	public static void getUpgrades() {
+		for (Unit myForge : UnitHolder.returnUnitList(UnitType.Protoss_Forge, true)) {
+			//VS TERRAN
+			if (Pinfel.game.enemy().getRace() == Race.Terran) {
+				if (myForge.canUpgrade(UpgradeType.Protoss_Ground_Weapons)) {
+					myForge.upgrade(UpgradeType.Protoss_Ground_Weapons);
+				}
+			}
+		}
+	}
+	
+	public static void buildingForgeUpdate() {
+		PinfelUtil.buildingBuilder(UnitType.Protoss_Forge, buildForgeCondition() && !BuildingPylon.pylonRequired());
+		getUpgrades();
+	}
+}
