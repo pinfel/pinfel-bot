@@ -1,0 +1,52 @@
+package buildingsPinfel;
+
+import bwapi.*;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.UnitHolder;
+import utilitiesPinfel.PinfelUtil;
+import utilitiesPinfel.PositionHolder;
+
+public class BuildingNexus {
+	
+	public static TilePosition nextExpandTile() {
+		TilePosition closestExpandTile = null;
+		for (TilePosition expandTiles : PositionHolder.baseLocations()) {
+			if (closestExpandTile == null || expandTiles.getDistance(Pinfel.game.self().getStartLocation()) 
+				< closestExpandTile.getDistance(Pinfel.game.self().getStartLocation()) && Pinfel.game.canBuildHere(expandTiles, UnitType.Protoss_Nexus)) {
+				closestExpandTile = expandTiles;
+			}
+		}	
+		return closestExpandTile;
+	}
+	
+	public static void probeBuilder() {
+		for (Unit myNexus : UnitHolder.myNexus()) {
+			if (myNexus.isCompleted() && !myNexus.isTraining() && PinfelUtil.noCommandForAWhile(myNexus) && PinfelUtil.enoughMoney(UnitType.Protoss_Probe)) {
+				//condition to build probes
+				if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) < 63 && Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe)
+						< Pinfel.game.self().allUnitCount(UnitType.Protoss_Nexus)*21) {
+					myNexus.build(UnitType.Protoss_Probe);
+				}
+			}
+		}
+	}
+	
+	public static Boolean conditionToBuildNexus() {
+		if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Nexus)*21 <= Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe)
+				&& Pinfel.game.self().allUnitCount(UnitType.Protoss_Nexus) < 3) {
+			return true;
+		}
+		return false;
+	}
+	
+	public static int totalProbesMade = 0;
+	
+	public static void buildingNexusUpdate() {
+		Pinfel.game.drawCircleMap(nextExpandTile().toPosition(), 3, Color.Green);
+		Pinfel.game.drawTextScreen(150, 10, "Probes: " + totalProbesMade + "-" + Pinfel.game.self().completedUnitCount(UnitType.Protoss_Probe) + "-" 
+				+ (Pinfel.game.self().allUnitCount(UnitType.Protoss_Probe) - Pinfel.game.self().completedUnitCount(UnitType.Protoss_Probe)));
+		Pinfel.game.drawTextScreen(10, 60, "Nexus required: " + conditionToBuildNexus());
+		probeBuilder();		
+		PinfelUtil.buildingBuilder(UnitType.Protoss_Nexus, conditionToBuildNexus());
+	}
+}
