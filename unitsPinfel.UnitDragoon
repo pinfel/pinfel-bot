@@ -1,0 +1,74 @@
+package unitsPinfel;
+
+import bwapi.Color;
+import bwapi.Race;
+import bwapi.Unit;
+import bwapi.UpgradeType;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.ArmyManager;
+import utilitiesPinfel.PinfelUtil;
+import utilitiesPinfel.UnitHolder;
+
+public class UnitDragoon {
+	public static void unitDragoonUpdate() {
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			if (ArmyManager.dragoonPressureEnd() == false) {
+				for (Unit myDragoon : UnitHolder.myDragoons()) {
+					//Pinfel.game.drawCircleMap(myDragoon.getPosition(), 150, Color.Cyan);
+					//WHEN WE DON'T HAVE RANGE UPGRADE
+					if (Pinfel.game.self().getMaxUpgradeLevel(UpgradeType.Singularity_Charge) == 0) {
+						//WHEN IDLE
+						if (myDragoon.isIdle() && PinfelUtil.noCommandForAWhile(myDragoon)) {
+							myDragoon.attack(UnitProbe.enemyStartTile.toPosition());
+						}
+						//IF SHIELDS ARE TOO LOW, RETREAT
+						if (myDragoon.getShields() <= 30) {
+							myDragoon.move(Pinfel.game.self().getStartLocation().toPosition());
+						}
+						//IF SHIELDS HAS REGENERATED A BIT, STOP COMMAND
+						if (myDragoon.getShields() == 60) {
+							myDragoon.stop();
+						}
+					}
+					//WHEN WE HAVE RANGE UPGRADE
+					if (Pinfel.game.self().getMaxUpgradeLevel(UpgradeType.Singularity_Charge) == 1) {
+						//IF HEALTHY
+						if (myDragoon.getShields() > 30) {
+							if ((Pinfel.game.getFrameCount()+10)%40 == 0) {
+								Boolean enemyNearby = false;
+								for (Unit enemyUnits : Pinfel.game.enemy().getUnits()) {
+									if (myDragoon.getUnitsInRadius(150).contains(enemyUnits)) {
+										enemyNearby = true;
+									}
+								}	
+								if (enemyNearby == false) {
+									myDragoon.attack(UnitProbe.enemyStartTile.toPosition());
+								}
+								if (enemyNearby == true) {
+									myDragoon.holdPosition();
+								}
+							}
+							
+							if (Pinfel.game.getFrameCount()%40 == 0) {
+								Boolean enemyNearby = false;
+								for (Unit enemyUnits : Pinfel.game.enemy().getUnits()) {
+									if (myDragoon.getUnitsInRadius(150).contains(enemyUnits)) {
+										enemyNearby = true;
+										break;
+									}
+								}
+								if (enemyNearby == true) {
+									myDragoon.move(Pinfel.game.self().getStartLocation().toPosition());
+								}
+							}
+						}
+						//IF NOT HEALTHY
+						if (myDragoon.getShields() <= 30) {
+							myDragoon.move(Pinfel.game.self().getStartLocation().toPosition());
+						}
+					}			
+				}
+			}
+		}
+	}
+}
