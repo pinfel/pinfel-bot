@@ -1,0 +1,110 @@
+package unitsPinfel;
+import java.util.HashSet;
+import java.util.Set;
+
+import bwapi.*;
+import bwta.BWTA;
+import bwta.BaseLocation;
+import pinfelBot.Pinfel;
+import utilitiesPinfel.PinfelUtil;
+import utilitiesPinfel.UnitHolder;
+
+public class UnitProbe {
+	
+	public static void whenProbeIsIdle() {
+		//RETURN CARGO AND MINE SAFE MINERAL
+		for (Unit probe : UnitHolder.myProbes()) {
+			if (probe.isIdle() && PinfelUtil.noCommandForAWhile(probe)) {
+				Unit closestMineral = null;
+				for (Unit safeMinerals : UnitHolder.safeMinerals()) {
+					if (closestMineral == null || probe.getDistance(safeMinerals.getPosition()) < probe.getDistance(closestMineral.getPosition())) {
+						closestMineral = safeMinerals;
+					}
+				}
+				if (probe.isCarryingMinerals() || probe.isCarryingGas()) {
+					probe.returnCargo(false);
+				}
+				probe.gather(closestMineral, probe.isCarryingMinerals() || probe.isCarryingGas());
+			}
+		}
+	}
+	
+	public static void whenMinerIsUnderAttack() {
+		//IF UNDER ATTACK, ATTACK ITS OWN POSITION
+		for (Unit probe : UnitHolder.myProbes()) {
+			if (probe.isUnderAttack() && (probe.isGatheringMinerals() || probe.isGatheringGas()) && probe.isAttacking()) {
+				probe.attack(probe.getPosition());
+			}
+		}
+	}
+	public static TilePosition enemyStartTile = null;
+	public static Unit scoutingProbe = null;
+	public static void scoutingProbe() {
+		if (Pinfel.game.enemy().getRace() == Race.Terran) {
+			if (Pinfel.game.self().allUnitCount(UnitType.Protoss_Gateway) >= 1 && scoutingProbe == null) {
+				for (Unit myProbes : UnitHolder.myProbes()) {
+					if (myProbes.isGatheringMinerals()) {
+						scoutingProbe = myProbes;
+					}
+				}
+			}
+			if (scoutingProbe != null) {
+				//Initial scout
+				TilePosition closestUnexploredBase = null;
+				Set<TilePosition> unexploredStartTile = new HashSet<TilePosition>();
+				for (BaseLocation startLocations : BWTA.getStartLocations()) {
+					TilePosition startTile = new TilePosition (startLocations.getX()/32, startLocations.getY()/32);
+					if (!Pinfel.game.isExplored(startTile)) {
+						unexploredStartTile.add(startTile);
+					}
+				}
+				if (unexploredStartTile.size() == 1) {
+					identifyEnemyStart();
+					if (enemyStartTile == null) {
+						for (TilePosition unexploredTile : unexploredStartTile) {
+							closestUnexploredBase = unexploredTile;
+							enemyStartTile = unexploredTile;
+						}
+					}
+				}
+				if (unexploredStartTile.size() > 1) {
+					for (TilePosition unexploredTile : unexploredStartTile) {
+						if (closestUnexploredBase == null || scoutingProbe.getDistance(unexploredTile.toPosition()) < 
+								scoutingProbe.getDistance(closestUnexploredBase.toPosition())) {
+							closestUnexploredBase = unexploredTile;
+						}
+					}
+				}
+				if (closestUnexploredBase != null && enemyStartTile == null) {
+					scoutingProbe.move(closestUnexploredBase.toPosition());
+				}
+			}
+		}
+	}
+	
+	public static void identifyEnemyStart() {
+		if (enemyStartTile == null) {
+			for (BaseLocation startLocations : BWTA.getStartLocations()) {
+				TilePosition startTile = new TilePosition (startLocations.getX()/32, startLocations.getY()/32);
+				for (Unit enemyUnits : Pinfel.game.enemy().getUnits()) {
+					if (enemyUnits.getType() == UnitType.Protoss_Nexus || enemyUnits.getType() == UnitType.Zerg_Hatchery
+							|| enemyUnits.getType() == UnitType.Terran_Command_Center) {
+						if (enemyUnits.getDistance(startTile.toPosition()) < 100) {
+							enemyStartTile = startTile;
+						}
+					}
+				}
+			}
+		}
+		if (enemyStartTile != null) {
+			Pinfel.game.drawTextMap(enemyStartTile.toPosition(), "Enemy spawn location");
+		}
+	}
+	
+	public static void unitProbeUpdate() {
+		whenProbeIsIdle();
+		whenMinerIsUnderAttack();
+		scoutingProbe();
+		identifyEnemyStart();
+	}
+}
